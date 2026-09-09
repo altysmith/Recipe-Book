@@ -1,0 +1,103 @@
+const $=s=>document.querySelector(s), form=$('#recipe-form');
+let recipes=[], current=null, editing={}, favorites=false, trash=false, dirty=false;
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function message(text){$('#status').textContent=text}
+async function api(path,body){if(body&&!navigator.onLine)throw Error('Connect to save or import recipes. Your ingredient checklist still works offline.');const r=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(12000)}:{signal:AbortSignal.timeout(5000)});const data=await r.json();if(!r.ok)throw Error(data.error||'Request failed');return data}
+function show(id){if(dirty&&!confirm('Leave without saving your recipe changes?'))return false;dirty=false;document.body.dataset.view=id;['library','detail','editor'].forEach(x=>$('#'+x).hidden=x!==id);message('');window.scrollTo(0,0);return true}
+function recipeImage(r){if(r.photo&&/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(r.photo))return `<img src="${r.photo}" alt="${esc(r.title)}">`;return r.id==='juicy-smoked-turkey-breast'?'<img src="/assets/turkey.png" alt="Smoked turkey breast from the original recipe">':'<span aria-hidden="true">✳</span>'}
+function pdfLink(r){return r.original_pdf?'/'+r.original_pdf.split('/').map(encodeURIComponent).join('/'):null}
+async function load(){
+ let snapshot;
+ try{snapshot=await recipeStorage.get('snapshot')}catch{}
+ try{
+  const fresh=await api('/api/recipes');
+  if(!Array.isArray(fresh))throw Error('Invalid recipe response');
+  recipes=fresh;
+  try{
+   await offlineShellReady;
+   snapshot={recipes:fresh,savedAt:new Date().toISOString()};
+   await recipeStorage.set('snapshot',snapshot);
+   $('#offline-state').textContent='Saved on this device · Updated '+new Date(snapshot.savedAt).toLocaleString();
+  }catch{$('#offline-state').textContent='Recipes loaded online. Offline storage is unavailable or full.'}
+ }catch(error){
+  if(!snapshot)throw Error('No saved recipes on this device yet. Connect once to save your cookbook.');
+  recipes=snapshot.recipes;
+  $('#offline-state').textContent='Viewing saved recipes · Last updated '+new Date(snapshot.savedAt).toLocaleString()+' · Imports and edits need a connection.';
+ }
+const selected=$('#tag').value;$('#tag').innerHTML='<option value="">All categories</option>'+[...new Set(recipes.flatMap(r=>r.tags||[]))].sort().map(t=>`<option>${esc(t)}</option>`).join('');$('#tag').value=selected;render()}
+function render(){const q=$('#search').value.toLowerCase(),tag=$('#tag').value;let list=recipes.filter(r=>!!r.deleted===trash&&(!favorites||r.favorite)&&(!tag||(r.tags||[]).includes(tag))&&[r.title,...r.ingredients.map(i=>i.text),...(r.tags||[])].join(' ').toLowerCase().includes(q));if($('#sort').value==='name')list.sort((a,b)=>a.title.localeCompare(b.title));if($('#sort').value==='time')list.sort((a,b)=>(a.total_minutes??Infinity)-(b.total_minutes??Infinity));renderCollections();$('#count').textContent=`(${recipes.filter(r=>!r.deleted).length})`;$('#cards').innerHTML=list.map(r=>`<article class="recipe-card"><button class="card-art" data-open="${esc(r.id)}" aria-label="Open ${esc(r.title)}">${recipeImage(r)}</button><div class="card-body"><span class="chip">${esc((r.tags||[]).join(' · ')||'From your collection')}</span><button class="card-open" data-open="${esc(r.id)}"><h3>${esc(r.title)}</h3></button><p>${r.total_minutes?esc(r.total_minutes)+' min':'Time not specified'} · ${r.ingredients.length} ingredients</p><div class="card-bottom"><span class="small">${esc(r.author||'Your kitchen notebook')}</span><button data-fav="${esc(r.id)}" aria-label="${r.favorite?'Unfavorite':'Favorite'} ${esc(r.title)}" aria-pressed="${!!r.favorite}">${r.favorite?'♥':'♡'}</button></div></div></article>`).join('')||'<p class="empty">No recipes here yet. Add a recipe or try another search.</p>';$('#cards').querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>detail(b.dataset.open));$('#cards').querySelectorAll('[data-fav]').forEach(b=>b.onclick=()=>favorite(b.dataset.fav))}
+async function favorite(id){try{let r=recipes.find(x=>x.id===id);await api('/api/recipes',{...r,favorite:!r.favorite});await load();if(!$('#detail').hidden)detail(id)}catch(e){message(e.message)}}
+async function detail(id){current=recipes.find(r=>r.id===id);if(!current)return;const r=current;if(!show('detail'))return;$('#detail').innerHTML=`<button class="back" id="home">← Recipe shelf</button><div class="detail-photo">${recipeImage(r)}</div><div class="detail-top"><p class="eyebrow">${esc((r.tags||[]).join(' · ')||'A RECIPE TO KEEP')}</p><h1>${esc(r.title)}</h1><p class="metadata">${esc(r.author||'Your kitchen')} · ${r.servings?esc(r.servings)+' servings':'Servings not specified'} · ${r.total_minutes?esc(r.total_minutes)+' minutes':'Total time not specified'}</p><div class="actions"><button id="edit">Edit recipe</button><button id="detail-fav">${r.favorite?'♥ Favorited':'♡ Favorite'}</button><button id="print">Print recipe</button><button id="trash-recipe">${r.deleted?'Restore recipe':'Move to trash'}</button>${pdfLink(r)?`<a href="${esc(pdfLink(r))}" target="_blank" rel="noopener">Original PDF ↗</a>`:''}${/^https?:\/\//i.test(r.source_url||'')?`<a href="${esc(r.source_url)}" target="_blank" rel="noopener">Source ↗</a>`:''}</div></div>${r.import?.status==='awaiting_user_review'?'<div class="notice">Imported recipe · Open Edit recipe to review and save your version.</div>':''}<div class="recipe-jump"><button id="jump-ingredients">Ingredients ↓</button><button id="jump-directions" ${r.instructions.length?'':'hidden'}>Directions ↓</button></div><div class="recipe-layout"><aside class="ingredient-box"><h2>What you’ll need</h2><span class="small">Checkmarks stay on this device.</span><button id="reset-checklist" type="button">Reset checklist</button>${r.ingredients.map(i=>`<label class="check"><input type="checkbox"><span>${esc(i.text)}</span></label>`).join('')}</aside><div><h2>${r.instructions.length?'Let’s make it':'Ingredient-only recipe'}</h2><ol class="steps">${r.instructions.map(i=>`<li>${esc(i.text)}</li>`).join('')}</ol>${r.timing_notes?.length?`<h2>Timing notes</h2><ul>${r.timing_notes.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:''}${r.notes?`<h2>Kitchen notes</h2><p class="notes">${esc(r.notes)}</p>`:''}</div></div>`;$('#home').onclick=()=>show('library');$('#edit').onclick=()=>editor(r);$('#detail-fav').onclick=()=>favorite(id);$('#print').onclick=()=>window.print();$('#trash-recipe').onclick=async()=>{try{await api('/api/recipes',{...r,deleted:!r.deleted});await load();show('library');message(r.deleted?'Recipe restored.':'Recipe moved to Trash. You can restore it anytime.')}catch(e){message(e.message)}};$('#jump-ingredients').onclick=()=>$('.ingredient-box').scrollIntoView({behavior:'smooth'});$('#jump-directions').onclick=()=>$('.steps').scrollIntoView({behavior:'smooth'});
+ const boxes=[...$('#detail').querySelectorAll('.check input')];
+ const key='checklist:'+r.id;
+ // Include the exact ingredient list in the saved state so edits cannot check the wrong line.
+ const signature=JSON.stringify(r.ingredients.map(i=>i.text));
+ boxes.forEach(b=>b.disabled=true);
+ let saved;
+ try{saved=await recipeStorage.get(key)}catch{message('Checklist storage is unavailable. Checkmarks will not survive reopening.')}
+ boxes.forEach((b,i)=>{b.checked=saved?.signature===signature&&!!saved.checked[i];b.disabled=false});
+ let pending=Promise.resolve();
+ const persist=()=>{const state={signature,checked:boxes.map(b=>b.checked)};pending=pending.then(()=>recipeStorage.set(key,state)).catch(()=>message('Could not save checkmarks on this device.'))};
+ boxes.forEach(b=>b.onchange=persist);
+ const reset=boxes[0]?.closest('.ingredient-box').querySelector('#reset-checklist');
+ if(reset)reset.onclick=()=>{boxes.forEach(b=>b.checked=false);persist()};
+}
+function editor(r={}){if(!show('editor'))return;editing=structuredClone(r);form.reset();$('#photo-preview').hidden=!r.photo;$('#photo-preview').src=r.photo||'';$('#import-panel').hidden=!!r.id;$('#edit-heading').textContent=r.id?'A little fine-tuning.':'Save something delicious.';['title','servings','total_minutes','author','source_url','notes'].forEach(k=>form.elements[k].value=r[k]??'');['ingredients','instructions'].forEach(k=>form.elements[k].value=(r[k]||[]).map(i=>i.text).join('\n'));form.elements.tags.value=(r.tags||[]).join(', ');$('#review-notice').hidden=!r.import;$('#review-notice').textContent=(r.import?.issues||[]).join('\n');$('#source-text').textContent=r.import?.raw_text||r.import?.raw_pages?.map(p=>p.text).join('\n\n')||'';$('#edit-pdf').hidden=!pdfLink(r);if(pdfLink(r))$('#edit-pdf').href=pdfLink(r)}
+async function extract(body){message('Reading your recipe…');$('#extract').disabled=true;$('#pdf').disabled=true;try{const r=await api('/api/import',body);editor(r);message('Draft ready. Check the title, line breaks, ingredients, and directions before saving.')}catch(e){message(e.message)}finally{$('#extract').disabled=false;$('#pdf').disabled=false}}
+$('#add').onclick=()=>editor();$('.brand').onclick=e=>{e.preventDefault();show('library')};$('#cancel').onclick=()=>show('library');$('#search').oninput=render;$('#sort').onchange=render;$('#tag').onchange=render;$('#favorites').onclick=()=>{favorites=!favorites;$('#favorites').setAttribute('aria-pressed',favorites);render()};$('#extract').onclick=()=>extract({text:$('#paste').value});$('#pdf').onchange=async e=>{const file=e.target.files[0];if(!file)return;if(file.size>10_000_000){message('Choose a PDF smaller than 10 MB.');return}const reader=new FileReader();reader.onload=()=>extract({pdf:reader.result.split(',')[1]});reader.onerror=()=>message('Could not read this file.');reader.readAsDataURL(file)};
+form.onsubmit=async e=>{e.preventDefault();const r={...editing};['title','servings','author','source_url','notes'].forEach(k=>r[k]=form.elements[k].value.trim());r.total_minutes=form.elements.total_minutes.value===''?null:Number(form.elements.total_minutes.value);r.tags=form.elements.tags.value.split(',').map(t=>t.trim()).filter(Boolean);['ingredients','instructions'].forEach(k=>r[k]=form.elements[k].value.split('\n').map(t=>t.trim()).filter(Boolean).map((text,i)=>({...((editing[k]||[]).find(x=>x.text===text)||{}),text,...(k==='instructions'?{number:i+1}:{})})));if(r.import)r.import={...r.import,status:'reviewed'};$('#save').disabled=true;try{const saved=await api('/api/recipes',r);dirty=false;await load();detail(saved.id);message('Recipe saved to your recipe book.')}catch(e){message(e.message)}finally{$('#save').disabled=false}};
+load().catch(e=>message('Could not load the recipe book: '+e.message));
+if(document.modelContext?.registerTool){
+ const lifecycle=new AbortController();
+ const register=tool=>{try{Promise.resolve(document.modelContext.registerTool(tool,{signal:lifecycle.signal})).catch(()=>{})}catch{}};
+ register({name:'list_saved_recipes',description:'List saved recipe titles and IDs from this recipe book.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true,untrustedContentHint:true},execute:async()=>{await load();return recipes.map(r=>({id:r.id,title:r.title}))}});
+ register({name:'open_saved_recipe',description:'Open an existing recipe and ingredient checklist without editing it.',inputSchema:{type:'object',properties:{id:{type:'string'}},required:['id'],additionalProperties:false},annotations:{readOnlyHint:false,untrustedContentHint:true},execute:async input=>{if(!input||typeof input.id!=='string')throw Error('Recipe ID is required');await load();if(!recipes.some(r=>r.id===input.id))throw Error('Recipe not found');detail(input.id);return {opened:input.id}}});
+ window.addEventListener('pagehide',()=>lifecycle.abort(),{once:true});
+}
+
+function renderCollections(){
+ const active=recipes.filter(r=>!r.deleted);
+ const groups=[{label:'All recipes',count:active.length,kind:'all',symbol:'▤'},{label:'Favorites',count:active.filter(r=>r.favorite).length,kind:'favorites',symbol:'♡'},...[...new Set(active.flatMap(r=>r.tags||[]))].map(tag=>({label:tag,count:active.filter(r=>(r.tags||[]).includes(tag)).length,kind:'tag',tag,symbol:'✳'}))];
+ $('#collections').innerHTML=groups.map((g,i)=>`<button class="collection tone-${i%4}" data-group="${i}"><strong>${esc(g.label)}</strong><small>${g.count} ${g.count===1?'recipe':'recipes'}</small><span aria-hidden="true">${g.symbol}</span></button>`).join('');
+ $('#collections').querySelectorAll('button').forEach(b=>b.onclick=()=>{const g=groups[Number(b.dataset.group)];trash=false;favorites=g.kind==='favorites';$('#favorites').setAttribute('aria-pressed',favorites);$('#tag').value=g.tag||'';$('#search').value='';render();$('.recipes-heading').scrollIntoView({behavior:'smooth'})});
+}
+document.querySelectorAll('[data-nav]').forEach(b=>b.onclick=()=>{
+ document.querySelectorAll('[data-nav]').forEach(x=>x.removeAttribute('aria-current'));b.setAttribute('aria-current','page');
+ const action=b.dataset.nav;
+ if(action==='add'){editor();return}
+ if(!show('library'))return;trash=false;favorites=action==='favorites';$('#favorites').setAttribute('aria-pressed',favorites);$('#tag').value='';$('#search').value='';render();
+ if(action==='search'){$('#search').focus();$('#search').scrollIntoView({block:'center'})}
+});
+
+$('#sync-recipes').onclick=async()=>{const b=$('#sync-recipes');b.disabled=true;try{await load()}catch(e){message(e.message)}finally{b.disabled=false}};
+window.addEventListener('offline',()=>{$('#offline-state').textContent='Offline · Reading saved recipes. Checkmarks stay on this device.'});
+window.addEventListener('online',()=>load().catch(e=>message(e.message)));
+$('#import-url').onclick=async()=>{
+ const button=$('#import-url'), input=$('#recipe-url');
+ if(!input.value.trim()||!input.checkValidity()){input.reportValidity();message('Enter a complete website URL starting with https://');return}
+ button.disabled=true;message('Reading the recipe website…');$('#url-candidates').hidden=true;
+ try{
+  const result=await api('/api/import-url',{url:input.value.trim()});
+  if(result.candidates.length===1){editor(result.candidates[0]);message('Website recipe ready to review. Nothing is saved until you choose Save recipe.')}
+  else{
+   const box=$('#url-candidates');box.hidden=false;box.innerHTML='<p>Choose the recipe to import:</p>'+result.candidates.map((r,i)=>`<button type="button" data-candidate="${i}">${esc(r.title||'Untitled recipe')}</button>`).join('');
+   box.querySelectorAll('button').forEach(b=>b.onclick=()=>{editor(result.candidates[Number(b.dataset.candidate)]);box.hidden=true;message('Review this recipe, then save.')});
+   message('Several recipes were found. Choose one above.');
+  }
+ }catch(e){message(e.message)}finally{button.disabled=false}
+};
+
+form.addEventListener('input',()=>{dirty=true});
+$('#paste').addEventListener('input',()=>{dirty=true});
+window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue=''}});
+$('#show-trash').onclick=()=>{trash=!trash;$('#show-trash').textContent=trash?'Back to cookbook':'Trash';favorites=false;$('#search').value='';$('#tag').value='';render()};
+$('#recipe-photo').onchange=async e=>{
+ const file=e.target.files[0];if(!file)return;
+ if(file.size>20_000_000){message('Choose a photo smaller than 20 MB.');return}
+ const url=URL.createObjectURL(file);const img=new Image();
+ try{await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=reject;img.src=url});
+  const scale=Math.min(1,1400/Math.max(img.width,img.height));const canvas=document.createElement('canvas');canvas.width=Math.round(img.width*scale);canvas.height=Math.round(img.height*scale);canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+  editing.photo=canvas.toDataURL('image/jpeg',0.82);$('#photo-preview').src=editing.photo;$('#photo-preview').hidden=false;dirty=true;
+ }catch{message('This photo format could not be read. Try JPEG or PNG.')}finally{URL.revokeObjectURL(url)}
+};
+$('#remove-photo').onclick=()=>{editing.photo=null;$('#photo-preview').hidden=true;dirty=true};
