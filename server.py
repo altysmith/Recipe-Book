@@ -113,7 +113,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         # Local-only app: reject browser cross-origin writes and non-JSON forms.
-        if self.headers.get('Origin') and self.headers['Origin'] != 'http://' + self.headers.get('Host', ''):
+        allowed_origin = os.environ.get('RECIPE_PUBLIC_ORIGIN') or 'http://' + self.headers.get('Host', '')
+        if self.headers.get('Origin') and self.headers['Origin'] != allowed_origin:
             return self.respond({'error': 'Origin rejected'}, 403)
         if self.headers.get('Content-Type', '').split(';')[0] != 'application/json':
             return self.respond({'error': 'Expected JSON'}, 415)

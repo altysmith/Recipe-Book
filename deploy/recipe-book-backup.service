@@ -1,0 +1,8 @@
+[Unit]
+Description=Recipe Book daily backup
+After=recipe-book.service
+[Service]
+Type=oneshot
+User=ealtenho
+UMask=0077
+ExecStart=/home/ealtenho/recipe-book/.venv/bin/python /home/ealtenho/recipe-book/deploy/backup.py

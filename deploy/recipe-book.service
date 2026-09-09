@@ -1,0 +1,19 @@
+[Unit]
+Description=Private Recipe Book
+After=network-online.target
+Wants=network-online.target
+[Service]
+User=ealtenho
+WorkingDirectory=/home/ealtenho/recipe-book
+Environment=RECIPE_PUBLIC_ORIGIN=https://recipes.altylab.com
+ExecStart=/home/ealtenho/recipe-book/.venv/bin/python server.py
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ealtenho/recipe-book/user_data
+UMask=0077
+[Install]
+WantedBy=multi-user.target
