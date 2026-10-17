@@ -4,6 +4,15 @@ let activeVideoJob=null;
 let categories=[], recipes=[], current=null, editing={}, favorites=false, trash=false, dirty=false;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function message(text){const inEditor=!$('#editor').hidden;$('#status').textContent=inEditor?'':text;$('#import-status').textContent=inEditor?text:''}
+function connectionNotice(show){
+ let notice=$('#connection-notice');
+ if(!show){notice?.remove();return}
+ if(notice)return;
+ notice=document.createElement('div');notice.id='connection-notice';notice.className='notice';notice.setAttribute('role','status');
+ const label=document.createElement('span');label.textContent='The live recipe book could not be reached. Your sign-in may have expired. ';
+ const link=document.createElement('a');link.href='/refresh';link.textContent='Reconnect and load the latest website';
+ notice.append(label,link);document.querySelector('.offline-bar').after(notice);
+}
 async function api(path,body){if(body&&!navigator.onLine)throw Error('Connect to save or import recipes. Your ingredient checklist still works offline.');const r=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(path==='/api/import-images'?100000:12000)}:{signal:AbortSignal.timeout(5000)});const data=await r.json();if(!r.ok)throw Error(data.error||'Request failed');return data}
 function show(id){if(dirty&&!confirm('Leave without saving your recipe changes?'))return false;if(activeVideoJob)stopVideoJob();importEpoch++;dirty=false;document.body.dataset.view=id;['library','detail','editor'].forEach(x=>$('#'+x).hidden=x!==id);message('');window.scrollTo(0,0);return true}
 function recipeImage(r){if(r.photo&&/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(r.photo))return `<img src="${r.photo}" alt="${esc(r.title)}">`;return r.id==='juicy-smoked-turkey-breast'?'<img src="/assets/turkey.png" alt="Smoked turkey breast from the original recipe">':'<span aria-hidden="true">✳</span>'}
@@ -15,6 +24,7 @@ async function load(){
   const fresh=await api('/api/recipes');
   if(!Array.isArray(fresh))throw Error('Invalid recipe response');
   recipes=fresh;
+  connectionNotice(false);
   try{
    await offlineShellReady;
    snapshot={recipes:fresh,savedAt:new Date().toISOString()};
@@ -22,6 +32,7 @@ async function load(){
    $('#offline-state').textContent='Saved on this device · Updated '+new Date(snapshot.savedAt).toLocaleString();
   }catch{$('#offline-state').textContent='Recipes loaded online. Offline storage is unavailable or full.'}
  }catch(error){
+  connectionNotice(true);
   if(!snapshot)throw Error('No saved recipes on this device yet. Connect once to save your cookbook.');
   recipes=snapshot.recipes;
   $('#offline-state').textContent='Viewing saved recipes · Last updated '+new Date(snapshot.savedAt).toLocaleString()+' · Imports and edits need a connection.';

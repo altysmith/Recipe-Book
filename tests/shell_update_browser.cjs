@@ -13,19 +13,19 @@ const server = http.createServer((request, response) => {
   response.setHeader('Cache-Control', 'no-store');
   if (['/', '/instagram', '/refresh'].includes(name)) {
     response.setHeader('Content-Type', 'text/html');
-    return response.end(`<!doctype html><html><body data-revision="${revision}"><main><div class="offline-bar">Recipes</div><section id="editor" hidden></section></main><script src="/offline-v13.js" defer></script></body></html>`);
+    return response.end(`<!doctype html><html><body data-revision="${revision}"><main><div class="offline-bar">Recipes</div><section id="editor" hidden></section></main><script src="/offline-v14.js" defer></script></body></html>`);
   }
   if (name === '/sw.js') {
     response.setHeader('Content-Type', 'text/javascript');
     return response.end(fs.readFileSync(path.join(web, 'sw.js')) + `\n// test revision ${workerRevision}\n`);
   }
-  if (name === '/offline-v13.js') {
+  if (name === '/offline-v14.js') {
     response.setHeader('Content-Type', 'text/javascript');
     return response.end(fs.readFileSync(path.join(web, 'offline.js')));
   }
   if (name === '/categories.json') return response.end('[]');
   if (name === '/assets/turkey.png') return response.end('image');
-  if (['/app-v13.js', '/style-v13.css'].includes(name)) return response.end('');
+  if (['/app-v14.js', '/style-v14.css'].includes(name)) return response.end('');
   response.statusCode = 404; response.end('Not found');
 });
 

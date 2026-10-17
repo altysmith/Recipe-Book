@@ -8,6 +8,8 @@ Open online once and wait for “Saved on this device.” Recipes and the app sh
 
 Website updates now load from the server on an online page refresh; the saved shell is used when offline. A service worker update refreshes a browsing page automatically. If an editor is open, the app offers a **Load website update** button after you finish your changes. If an older browser cache still shows a previous release, open `https://recipes.altylab.com/refresh` once while online. This does not clear saved recipes or ingredient checklists.
 
+If the page says **Viewing saved recipes** with an old date while your phone is online, the live recipe API could not be reached. The site now shows **Reconnect and load the latest website**. Follow it and complete the Cloudflare Access sign-in if prompted; refreshing the old cached page alone cannot restore an expired session.
+
 PDF import currently extracts embedded text and recognizes common section headings. It does not use OCR or AI, infer missing fields, or reliably resolve columns, multi-recipe files, line wrapping, and printed headers. Review drafts against the retained original PDF before saving. Scanned PDFs retain the original but require manual text entry. The turkey sample was manually visually verified.
 
 Website imports: Add a recipe -> Website recipe URL -> Import from website. Reads Schema.org Recipe JSON-LD into an editable draft, including ingredient-only recipes. Multiple recipes present a chooser. Source attribution is retained. Pages that block requests or lack supported recipe data require pasting text or a print-page link. No recipe is saved until you review and select Save recipe.

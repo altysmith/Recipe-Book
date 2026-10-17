@@ -123,7 +123,8 @@ class Handler(BaseHTTPRequestHandler):
             # Versioned shell paths bypass older cache-first service workers.
             aliases = {'/instagram': 'index.html', '/refresh': 'index.html',
                        '/app-v12.js': 'app.js', '/offline-v12.js': 'offline.js', '/style-v12.css': 'style.css',
-                       '/app-v13.js': 'app.js', '/offline-v13.js': 'offline.js', '/style-v13.css': 'style.css'}
+                       '/app-v13.js': 'app.js', '/offline-v13.js': 'offline.js', '/style-v13.css': 'style.css',
+                       '/app-v14.js': 'app.js', '/offline-v14.js': 'offline.js', '/style-v14.css': 'style.css'}
             file = (base / aliases.get(path, 'index.html' if path == '/' else path.lstrip('/'))).resolve()
         if not file.is_relative_to(base) or not file.is_file():
             return self.respond({'error': 'Not found'}, 404)

@@ -81,13 +81,13 @@ class RecipeTests(unittest.TestCase):
         page=urlopen(self.url+'/instagram').read().decode()
         self.assertIn('Instagram Reel',page)
         self.assertEqual(urlopen(self.url+'/refresh').read().decode(),urlopen(self.url+'/').read().decode())
-        self.assertIn('/app-v13.js',page)
-        for alias,original in (('/app-v13.js','/app.js'),('/offline-v13.js','/offline.js'),('/style-v13.css','/style.css')):
+        self.assertIn('/app-v14.js',page)
+        for alias,original in (('/app-v14.js','/app.js'),('/offline-v14.js','/offline.js'),('/style-v14.css','/style.css')):
             self.assertEqual(urlopen(self.url+alias).read(),urlopen(self.url+original).read())
 
     def test_shell_updates_from_network_without_caching_recipe_api(self):
         worker=urlopen(self.url+'/sw.js').read().decode()
-        self.assertIn("recipe-shell-v13",worker)
+        self.assertIn("recipe-shell-v14",worker)
         self.assertIn("'/refresh'",worker)
         self.assertIn('await fetch(event.request',worker)
         self.assertIn('await cache.match(url.pathname)',worker)

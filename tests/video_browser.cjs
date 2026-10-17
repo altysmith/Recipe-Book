@@ -45,6 +45,13 @@ const { chromium } = require('playwright');
       await page.getByRole('heading',{name:'My pasta'}).waitFor();
       const rows=await (await page.request.get((process.env.TEST_URL || 'http://127.0.0.1:8783')+'/api/recipes')).json();
       assert(rows.some(r=>r.title==='My pasta'&&r.source_url===draft.source_url&&r.import.status==='reviewed'&&!r.import.raw_text));
+      await page.route('**/api/recipes', route=>route.fulfill({status:503,contentType:'text/html',body:'Unavailable'}));
+      await page.locator('#sync-recipes').click();
+      await page.getByRole('link',{name:'Reconnect and load the latest website'}).waitFor();
+      assert.equal(await page.getByRole('link',{name:'Reconnect and load the latest website'}).getAttribute('href'),'/refresh');
+      await page.unroute('**/api/recipes');
+      await page.locator('#sync-recipes').click();
+      await page.locator('#connection-notice').waitFor({state:'detached'});
       assert.deepEqual(errors,[]);
       await page.close();
     }
