@@ -13,19 +13,19 @@ const server = http.createServer((request, response) => {
   response.setHeader('Cache-Control', 'no-store');
   if (['/', '/instagram', '/refresh'].includes(name)) {
     response.setHeader('Content-Type', 'text/html');
-    return response.end(`<!doctype html><html><body data-revision="${revision}"><main><div class="offline-bar">Recipes</div><section id="editor" hidden></section></main><script src="/offline-v15.js" defer></script></body></html>`);
+    return response.end(`<!doctype html><html><body data-revision="${revision}"><main><div class="offline-bar">Recipes</div><section id="editor" hidden></section></main><script src="/offline-v16.js" defer></script></body></html>`);
   }
   if (name === '/sw.js') {
     response.setHeader('Content-Type', 'text/javascript');
     return response.end(fs.readFileSync(path.join(web, 'sw.js')) + `\n// test revision ${workerRevision}\n`);
   }
-  if (name === '/offline-v15.js') {
+  if (name === '/offline-v16.js') {
     response.setHeader('Content-Type', 'text/javascript');
     return response.end(fs.readFileSync(path.join(web, 'offline.js')));
   }
   if (name === '/categories.json') return response.end('[]');
   if (name === '/assets/turkey.png') return response.end('image');
-  if (['/app-v15.js', '/style-v15.css'].includes(name)) return response.end('');
+  if (['/app-v16.js', '/style-v16.css'].includes(name)) return response.end('');
   response.statusCode = 404; response.end('Not found');
 });
 
@@ -41,7 +41,7 @@ const server = http.createServer((request, response) => {
     await page.waitForFunction(() => !!navigator.serviceWorker.controller);
     assert.equal(await page.locator('body').getAttribute('data-revision'), '1');
     assert.equal(await page.evaluate(async()=>{
-      const cache=await caches.open('recipe-shell-v15');
+      const cache=await caches.open('recipe-shell-v16');
       return !!(await cache.match('/refresh'));
     }),false,
       'sign-in recovery must bypass the service worker cache');

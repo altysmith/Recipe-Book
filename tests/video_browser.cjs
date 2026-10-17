@@ -30,6 +30,8 @@ const { chromium } = require('playwright');
       await page.getByText('Retrieving video and caption…').waitFor();
       await page.getByText('Instagram prevented this video from being downloaded.',{exact:false}).waitFor();
       assert.equal(await page.locator('#import-video').isEnabled(),true);
+      assert.equal(await page.locator('#video-url').inputValue(),'https://www.instagram.com/reel/AbCd12345/?igsh=test',
+        'a failed import keeps the link for retry');
       await page.unrouteAll();
       await page.route('**/api/import-video', async route=>route.fulfill({status:202,contentType:'application/json',body:JSON.stringify({job_id:'y'.repeat(24),token:'secret',state:'queued'})}));
       const draft={title:'Pasta',ingredients:[{text:'1 cup pasta'}],instructions:[{text:'Boil pasta.',number:1}],tags:[],author:'cookalice',source_url:'https://www.instagram.com/reel/AbCd12345/',import:{method:'instagram_reel',status:'awaiting_user_review',raw_text:'Original caption\n1 cup pasta\n\nAudio transcript\nBoil pasta.\n\nOn-screen text\n(none)',issues:['Review quantity.']}};
@@ -46,6 +48,8 @@ const { chromium } = require('playwright');
       const rows=await (await page.request.get((process.env.TEST_URL || 'http://127.0.0.1:8783')+'/api/recipes')).json();
       assert(rows.some(r=>r.title==='My pasta'&&r.source_url===draft.source_url&&r.import.status==='reviewed'&&!r.import.raw_text));
       await page.getByRole('button',{name:'+ Add a recipe'}).click();
+      await page.getByRole('button',{name:'Instagram Reel'}).click();
+      assert.equal(await page.locator('#video-url').inputValue(),'','a new import starts with an empty Reel link');
       await page.route('**/api/recipes',route=>route.fulfill({status:302,headers:{Location:'/login'},body:''}));
       await page.locator('#sync-recipes').click();
       await page.getByRole('link',{name:'Reconnect and load the latest website'}).waitFor();
