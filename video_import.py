@@ -178,7 +178,10 @@ def metadata(url, cancel=None):
                   and f.get('vcodec') != 'none' and f.get('ext') in ('mp4', 'mov')]
     candidates = [f for f in candidates if not f.get('filesize') or f['filesize'] <= MAX_BYTES]
     if not candidates: raise VideoError('No supported downloadable video format was available.')
-    candidates.sort(key=lambda f: (min(f.get('height') or 0, 720), -(f.get('filesize') or 0)), reverse=True)
+    # Instagram often lists high-resolution DASH video without its companion audio.
+    # Prefer a playable format whose audio codec is present or not specified.
+    candidates.sort(key=lambda f: (f.get('acodec') != 'none',
+                                   min(f.get('height') or 0, 720), -(f.get('filesize') or 0)), reverse=True)
     media_target(candidates[0]['url'])
     return info, candidates[0]['url']
 
@@ -210,7 +213,36 @@ def verify_duration(video, cancel=None):
     return duration
 
 
-def download(url, target, cancel=None):
+def has_audio(media, cancel=None):
+    ffprobe = os.environ.get('RECIPE_FFPROBE') or shutil.which('ffprobe')
+    if not ffprobe: raise VideoError('FFprobe is not installed on the recipe server.')
+    output = checked_run([ffprobe, '-v', 'error', '-select_streams', 'a',
+                          '-show_entries', 'stream=index', '-of', 'json', str(media)],
+                         30, cancel, output_limit=100_000,
+                         failure='The downloaded video audio could not be inspected.')
+    try: data = json.loads(output)
+    except ValueError: raise VideoError('The downloaded video audio could not be inspected.') from None
+    return isinstance(data, dict) and bool(data.get('streams'))
+
+
+def companion_audio(info, remaining_bytes):
+    formats = info.get('formats') or []
+    candidates = [f for f in formats if isinstance(f, dict) and isinstance(f.get('url'), str)
+                  and f.get('protocol', 'https') in ('https', 'http')
+                  and f.get('vcodec') == 'none' and f.get('acodec') not in (None, 'none')
+                  and f.get('ext') in ('m4a', 'mp4')
+                  and (not f.get('filesize') or f['filesize'] <= remaining_bytes)]
+    candidates.sort(key=lambda f: (f.get('abr') or 0), reverse=True)
+    for candidate in candidates:
+        try: media_target(candidate['url'])
+        except VideoError: continue
+        return candidate['url']
+    return None
+
+
+def download(url, target, cancel=None, max_bytes=None):
+    max_bytes = MAX_BYTES if max_bytes is None else max_bytes
+    if max_bytes <= 0: raise VideoError('The video is too large to import.')
     deadline = time.monotonic() + 180
     for _ in range(4):
         p, host, ip = media_target(url)
@@ -231,17 +263,18 @@ def download(url, target, cancel=None):
             if response.status != 200:
                 raise VideoError('Instagram prevented this video from being downloaded. Try another public Reel.')
             content_type = response.getheader('Content-Type', '').lower()
-            if content_type and not (content_type.startswith('video/') or content_type.startswith('application/octet-stream')):
+            if content_type and not (content_type.startswith('video/') or content_type.startswith('audio/')
+                                     or content_type.startswith('application/octet-stream')):
                 raise VideoError('Instagram did not return a video file.')
             size = response.getheader('Content-Length')
-            if size and int(size) > MAX_BYTES: raise VideoError('The video is too large to import.')
+            if size and int(size) > max_bytes: raise VideoError('The video is too large to import.')
             total = 0
             with target.open('wb') as output:
                 while chunk := response.read(64 * 1024):
                     if cancel is not None and cancel.is_set(): raise Canceled('Video import canceled.')
                     if time.monotonic() > deadline: raise VideoError('The video download timed out.')
                     total += len(chunk)
-                    if total > MAX_BYTES: raise VideoError('The video is too large to import.')
+                    if total > max_bytes: raise VideoError('The video is too large to import.')
                     output.write(chunk)
             return
         except (OSError, ValueError) as exc:
@@ -318,7 +351,19 @@ def import_video(url, progress, cancel=None):
         download(media, video, cancel)
         verify_duration(video, cancel)
         progress('transcribing')
-        transcript, speech_warning = transcribe(video, folder, cancel)
+        speech_source = video
+        speech_warning = None
+        if not has_audio(video, cancel):
+            audio_url = companion_audio(info, MAX_BYTES - video.stat().st_size)
+            if audio_url:
+                speech_source = folder / 'audio.m4a'
+                download(audio_url, speech_source, cancel, max_bytes=MAX_BYTES - video.stat().st_size)
+                verify_duration(speech_source, cancel)
+            else:
+                speech_warning = 'No downloadable audio stream was available; only the caption and on-screen text were used.'
+        transcript = ''
+        if speech_warning is None:
+            transcript, speech_warning = transcribe(speech_source, folder, cancel)
         progress('extracting_text')
         onscreen, text_warning = screen_text(video, folder, cancel)
         progress('interpreting')

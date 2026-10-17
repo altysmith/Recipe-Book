@@ -56,6 +56,31 @@ class VideoImportTests(unittest.TestCase):
             with patch('video_import.checked_run', return_value=json.dumps(oversized)):
                 with self.assertRaises(video_import.VideoError): video_import.metadata(URL)
 
+    def test_progressive_video_preferred_over_video_only_dash(self):
+        formats = [
+            {'url': 'https://video.cdninstagram.com/silent.mp4', 'ext': 'mp4',
+             'protocol': 'https', 'height': 2560, 'acodec': 'none'},
+            {'url': 'https://video.cdninstagram.com/playable.mp4', 'ext': 'mp4',
+             'protocol': 'https', 'height': None, 'acodec': None},
+        ]
+        with (patch('video_import.shutil.which', return_value='yt-dlp'),
+              patch('video_import.public_host', return_value='1.2.3.4'),
+              patch('video_import.checked_run', return_value=json.dumps({'formats': formats}))):
+            self.assertEqual(video_import.metadata(URL)[1], formats[1]['url'])
+
+    def test_audio_probe_and_companion_selection(self):
+        with (patch('video_import.shutil.which', return_value='ffprobe'),
+              patch('video_import.checked_run', return_value=json.dumps({'streams': []}))):
+            self.assertFalse(video_import.has_audio(Path('video.mp4')))
+        with (patch('video_import.shutil.which', return_value='ffprobe'),
+              patch('video_import.checked_run', return_value=json.dumps({'streams': [{'index': 1}]}))):
+            self.assertTrue(video_import.has_audio(Path('video.mp4')))
+        info = {'formats': [{'url': 'https://video.cdninstagram.com/audio.m4a', 'ext': 'm4a',
+                            'protocol': 'https', 'vcodec': 'none', 'acodec': 'mp4a.40.5', 'filesize': 100}]}
+        with patch('video_import.public_host', return_value='1.2.3.4'):
+            self.assertIsNone(video_import.companion_audio(info, 99))
+            self.assertEqual(video_import.companion_audio(info, 100), info['formats'][0]['url'])
+
     def test_downloaded_duration_is_verified(self):
         with patch('video_import.shutil.which', return_value='ffprobe'):
             for payload in ({'format':{'duration':'42.5'},'streams':[{'duration':'N/A'}]},
@@ -135,6 +160,26 @@ class VideoImportTests(unittest.TestCase):
         self.assertTrue(any('differs' in w for w in result['import']['issues']))
         self.assertIn('2 tbsp garlic powder', result['import']['raw_text'])
 
+    def test_full_caption_preserves_ranges_and_ignores_spoken_fragments(self):
+        caption = ('Roasted Red Pepper Soup!\nIngredients:\n'
+                   '- 3 red bell peppers (Cut in half)\n'
+                   '- ~4 lbs tomatoes (2 large hot house, 2 Roma - use whatever combo you like)\n'
+                   '- 2 onions, halved\n- 2 heads of garlic\n'
+                   '- 2-4 tbsp Olive or avocado oil\n'
+                   '- ½ tsp each dried basil, dried oregano, dried thyme, chili flakes and paprika\n'
+                   '- Salt & pepper, to taste\n- Pinch of brown sugar\n'
+                   '- 1 tbsp balsamic vinegar\n- 2–3 cups vegetable broth\n'
+                   'Instructions:\n1. Preheat oven to 400°F\n2. Roast for 40–50 minutes.')
+        transcript = ('Today we are making a roasted garlic red pepper soup. '
+                      'Toss onion and garlic onto a sheet. Add a pinch of brown sugar and some broth.')
+        result = interpret(URL, INFO, caption, transcript, '')
+        lines = [item['text'] for item in result['ingredients']]
+        self.assertEqual(len(lines), 10)
+        self.assertIn('~4 lbs tomatoes (2 large hot house, 2 Roma - use whatever combo you like)', lines)
+        self.assertIn('2-4 tbsp Olive or avocado oil', lines)
+        self.assertIn('2–3 cups vegetable broth', lines)
+        self.assertFalse(any('soup' in line for line in lines))
+
     def test_vague_amount_and_nonrecipe(self):
         result = interpret(URL, INFO, '', 'Add some parmesan. Stir.', '')
         self.assertTrue(any('not specified' in w for w in result['import']['issues']))
@@ -158,6 +203,7 @@ class VideoImportTests(unittest.TestCase):
         with (patch('video_import.metadata', return_value=(INFO, 'https://video.cdninstagram.com/x.mp4')),
               patch('video_import.download', side_effect=fake_download),
               patch('video_import.verify_duration', return_value=42.0) as probe,
+              patch('video_import.has_audio', return_value=True),
               patch('video_import.transcribe', return_value=('Chop the garlic. Add olive oil. Cook in a pan.', None)),
               patch('video_import.screen_text', return_value=('3 cloves garlic\n2 tbsp olive oil', None))):
             draft=video_import.import_video(URL, stages.append)
@@ -173,6 +219,7 @@ class VideoImportTests(unittest.TestCase):
         with (patch('video_import.metadata', return_value=(info, 'https://video.cdninstagram.com/x.mp4')),
               patch('video_import.download') as download,
               patch('video_import.verify_duration', return_value=42.0),
+              patch('video_import.has_audio', return_value=True),
               patch('video_import.transcribe', return_value=('Add garlic to the pan.', None)) as transcribe,
               patch('video_import.screen_text', return_value=('3 cloves garlic', None)) as ocr):
             draft=video_import.import_video(URL, lambda stage: None)
@@ -187,12 +234,49 @@ class VideoImportTests(unittest.TestCase):
         with (patch('video_import.metadata', return_value=(info, 'https://video.cdninstagram.com/x.mp4')),
               patch('video_import.download', side_effect=fake_download),
               patch('video_import.verify_duration', return_value=42.0) as probe,
+              patch('video_import.has_audio', return_value=True),
               patch('video_import.transcribe', return_value=('Add 2 tbsp olive oil. Stir.', None)) as speech,
               patch('video_import.screen_text', return_value=('', None))):
             draft=video_import.import_video(URL, lambda stage: None)
         self.assertEqual(draft['ingredients'][0]['text'],'2 tbsp olive oil')
         probe.assert_called_once(); speech.assert_called_once()
         self.assertFalse(holder[0].parent.exists())
+
+    def test_separate_audio_is_downloaded_within_total_limit(self):
+        audio = 'https://video.cdninstagram.com/speech.m4a'
+        info = {**INFO, 'formats': [{'url': audio, 'ext': 'm4a', 'protocol': 'https',
+                                    'vcodec': 'none', 'acodec': 'mp4a.40.5', 'filesize': 100}]}
+        calls = []
+        def fake_download(url, target, cancel, max_bytes=None):
+            calls.append((url, target, max_bytes)); target.write_bytes(b'fixture')
+        with (patch('video_import.metadata', return_value=(info, 'https://video.cdninstagram.com/silent.mp4')),
+              patch('video_import.download', side_effect=fake_download),
+              patch('video_import.verify_duration', return_value=25.0) as duration,
+              patch('video_import.has_audio', return_value=False),
+              patch('video_import.public_host', return_value='1.2.3.4'),
+              patch('video_import.transcribe', return_value=('Add 2 tbsp olive oil. Stir.', None)) as speech,
+              patch('video_import.screen_text', return_value=('', None))):
+            draft = video_import.import_video(URL, lambda stage: None)
+        self.assertEqual(draft['ingredients'][0]['text'], '2 tbsp olive oil')
+        self.assertEqual(calls[1][0], audio)
+        self.assertEqual(calls[1][2], video_import.MAX_BYTES - len(b'fixture'))
+        self.assertEqual(speech.call_args.args[0], calls[1][1])
+        self.assertEqual(duration.call_count, 2)
+        self.assertFalse(calls[0][1].parent.exists())
+
+    def test_missing_audio_uses_caption_and_onscreen_evidence(self):
+        info = {**INFO, 'description': 'Add olive oil and stir.'}
+        def fake_download(url, target, cancel): target.write_bytes(b'video fixture')
+        with (patch('video_import.metadata', return_value=(info, 'https://video.cdninstagram.com/silent.mp4')),
+              patch('video_import.download', side_effect=fake_download),
+              patch('video_import.verify_duration', return_value=25.0),
+              patch('video_import.has_audio', return_value=False),
+              patch('video_import.transcribe') as speech,
+              patch('video_import.screen_text', return_value=('2 tbsp olive oil', None))):
+            draft = video_import.import_video(URL, lambda stage: None)
+        speech.assert_not_called()
+        self.assertEqual(draft['ingredients'][0]['text'], '2 tbsp olive oil')
+        self.assertTrue(any('No downloadable audio stream' in issue for issue in draft['import']['issues']))
 
     def test_oversized_duration_stops_before_transcription(self):
         holder=[]

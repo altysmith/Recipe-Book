@@ -9,7 +9,7 @@ UNIT = re.compile(r'\b(?:cups?|tbsp|tablespoons?|tsp|teaspoons?|lbs?|pounds?|oz|
 ACTION = re.compile(r'\b(?:add|mix|stir|whisk|chop|dice|slice|cut|heat|cook|bake|roast|boil|simmer|fry|saute|sauté|sear|flip|pour|toss|season|sprinkle|fold|serve|combine|preheat|blend|marinate|drain|top|spread)\b', re.I)
 FOOD = re.compile(r'\b(?:oil|butter|salt|pepper|garlic|onion|chicken|beef|pork|fish|salmon|shrimp|rice|pasta|flour|sugar|milk|cream|cheese|parmesan|egg|tomato|broth|paprika|cumin|basil|oregano|potato|carrot|lemon|lime|water|vinegar|sauce|honey|bread|beans|chocolate|vanilla|cinnamon|yogurt|spinach|mushroom|zucchini|chili|cocoa|baking powder)\b', re.I)
 HEADINGS = re.compile(r'^\s*(?:ingredients?|directions?|instructions?|method|steps?|what you need)\s*:?\s*$', re.I)
-PROMO = re.compile(r'\b(?:follow me|link in bio|subscribe|comment below|sponsored|shop now|save this reel|views?|likes?|followers?)\b', re.I)
+PROMO = re.compile(r'\b(?:follow me|link in bio|subscribe|comment below|sponsored|shop now|save this reel|views?|followers?)\b', re.I)
 TIME_OR_TEMP = re.compile(r'^(?:minutes?|mins?|hours?|hrs?|seconds?|secs?|degrees?|°[CF]|°|followers?|people)\b', re.I)
 NUMBER_WORDS = {'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5, 'six': 6,
                 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10, 'a': 1, 'an': 1, 'half': Fraction(1, 2)}
@@ -145,6 +145,11 @@ def visual_ingredients(text):
 def interpret(source, info, caption, transcript, onscreen, stage_warnings=(), timestamped=None):
     caption_title, cap_ing, cap_steps = explicit_lines(caption)
     speech_ing, speech_steps = speech_parts(transcript)
+    # When the creator supplied a full ingredient list, unquantified speech
+    # fragments usually repeat parts of it (or capture words from directions).
+    # Keep explicit spoken amounts so disagreements can still be reviewed.
+    if cap_ing and cap_steps:
+        speech_ing = [line for line in speech_ing if amount(line)]
     visual_ing = visual_ingredients(onscreen)
     warnings = list(stage_warnings); ingredients = []; evidence = {}; conflicts = set()
     if len(re.findall(r'(?im)^\s*ingredients?\s*:', caption)) > 1:
@@ -153,7 +158,9 @@ def interpret(source, info, caption, transcript, onscreen, stage_warnings=(), ti
         warnings.append('The creator caption points to an external recipe source. Check it for missing details.')
     for kind, lines in (('caption', cap_ing), ('audio', speech_ing), ('on-screen text', visual_ing)):
         for line in lines:
-            for part in ingredient_lines(line):
+            # A caption ingredient is already a complete line. Splitting it at
+            # every numeral corrupts ranges and parenthetical alternatives.
+            for part in ([line] if kind == 'caption' else ingredient_lines(line)):
                 key = ingredient_key(part)
                 if not key: continue
                 existing = matched_evidence(key, evidence)
