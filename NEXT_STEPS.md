@@ -1,6 +1,6 @@
 # Upcoming recipe inputs
 
-- Website URL import is implemented for Schema.org Recipe JSON-LD. It preserves attribution and the final source URL, supports choosing among multiple recipes, blocks private/local targets on every redirect, and connects to validated IP addresses. Unsupported pages offer print-link or paste alternatives. Website code is never executed. Imported photos are not downloaded yet.
+- Website URL import is implemented for Schema.org Recipe JSON-LD. It preserves attribution and the final source URL, supports choosing among multiple recipes, blocks private/local targets on every redirect, and connects to validated IP addresses. Unsupported pages offer print-link or paste alternatives. Website code is never executed. Structured recipe photos are downloaded into the selected draft when available; failed downloads allow manual photo upload.
 - Pasted recipes are already supported by Add recipe -> Organize pasted text.
 - Directions are optional for seasoning blends and other ingredient-only recipes.
 

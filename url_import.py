@@ -1,4 +1,7 @@
 """Fetch public recipe pages without executing website code or following private redirects."""
+import base64
+import io
+import warnings
 import http.client
 import ipaddress
 import socket
@@ -20,7 +23,7 @@ def public_target(url):
         raise ValueError('Only public websites can be imported; local and private addresses are not supported.')
     return p,host,addresses[0][4][0]
 
-def fetch_page(url):
+def fetch_page(url, image=False):
     for _ in range(5):
         p,host,ip=public_target(url)
         port=p.port or (443 if p.scheme=='https' else 80)
@@ -30,13 +33,19 @@ def fetch_page(url):
         try:
             if p.scheme=='https': sock=ssl.create_default_context().wrap_socket(sock,server_hostname=host)
             conn.sock=sock
-            conn.request('GET',(p.path or '/')+('?' + p.query if p.query else ''),headers={'Host':p.netloc,'User-Agent':'LittleRecipeBox/1.0','Accept':'text/html','Accept-Encoding':'identity'})
+            conn.request('GET',(p.path or '/')+('?' + p.query if p.query else ''),headers={'Host':p.netloc,'User-Agent':'LittleRecipeBox/1.0','Accept':'image/*' if image else 'text/html','Accept-Encoding':'identity'})
             response=conn.getresponse()
             if response.status in (301,302,303,307,308):
                 location=response.getheader('Location')
                 if not location: raise ValueError('The website returned an incomplete redirect.')
                 url=urljoin(url,location);continue
             if response.status!=200: raise ValueError('This website could not be read. Try its print recipe page or paste the recipe text.')
+            if image:
+                if not response.getheader('Content-Type','').lower().startswith('image/'):
+                    raise ValueError('This link is not an image.')
+                data=response.read(8_000_001)
+                if len(data)>8_000_000: raise ValueError('Photo is too large.')
+                return data,url
             if 'html' not in response.getheader('Content-Type','').lower(): raise ValueError('This link is not a web page. Use PDF upload for PDF links.')
             data=response.read(3_000_001)
             if len(data)>3_000_000: raise ValueError('This page is too large. Try its print recipe page or paste the text.')
@@ -112,9 +121,38 @@ def parse_page(html,url):
             'ingredients':[{'text':x} for x in ingredients], 'instructions':[{'text':x,'number':i+1} for i,x in enumerate(steps)],
             'servings':'; '.join(lines(recipe.get('recipeYield',''))), 'total_minutes':minutes(recipe.get('totalTime')),
             'tags':lines(recipe.get('recipeCategory',[])), 'notes':'',
+            'image_url':image_url(recipe.get('image'),url),
             'import':{'status':'awaiting_user_review','method':'website_jsonld','issues':issues,'raw_text':json.dumps(recipe,ensure_ascii=False,indent=2)}})
     return result[:20]
 
 def import_url(url):
     try:html,final=fetch_page(url);return {'candidates':parse_page(html,final)}
     except (OSError,http.client.HTTPException,UnicodeError) as e:raise ValueError('Could not reach this website. Try again, use its print recipe link, or paste the recipe text.') from e
+
+def image_url(value, base):
+    if isinstance(value, list):
+        return next((url for item in value if (url := image_url(item, base))), None)
+    if isinstance(value, dict):
+        return image_url(value.get('contentUrl') or value.get('url'), base)
+    if isinstance(value, str) and value.strip():
+        url = urljoin(base, value.strip())
+        if urlsplit(url).scheme in ('http', 'https'): return url
+    return None
+
+def import_photo(url):
+    try:
+        from PIL import Image, ImageOps
+        data, final = fetch_page(url, image=True)
+        with warnings.catch_warnings():
+            warnings.simplefilter('error', Image.DecompressionBombWarning)
+            with Image.open(io.BytesIO(data)) as source:
+                if source.width * source.height > 20_000_000:
+                    raise ValueError('Photo dimensions are too large.')
+                photo = ImageOps.exif_transpose(source)
+                photo.thumbnail((1400, 1400))
+                photo = photo.convert('RGB')
+                output = io.BytesIO()
+                photo.save(output, 'JPEG', quality=82)
+        return {'photo':'data:image/jpeg;base64,' + base64.b64encode(output.getvalue()).decode()}
+    except (ValueError, OSError, http.client.HTTPException, Image.DecompressionBombWarning, Image.DecompressionBombError):
+        return {'photo':None, 'warning':'The website photo could not be downloaded. You can add one manually.'}

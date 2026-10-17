@@ -16,6 +16,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, unquote
 
 ROOT = Path(__file__).resolve().parent
+CATEGORIES = json.loads((ROOT / 'web/categories.json').read_text())
+
+def category_tags(tags):
+    lookup = {name.casefold(): name for name in CATEGORIES}
+    return list(dict.fromkeys(lookup[t.strip().casefold()] for t in tags if isinstance(t, str) and t.strip().casefold() in lookup)) if isinstance(tags, list) else []
+
 DATA = Path(os.environ.get('RECIPE_DATA_DIR', ROOT / 'user_data'))
 
 @contextmanager
@@ -72,7 +78,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == '/api/recipes':
             with connect() as db:
                 rows = db.execute('SELECT document_json,created_at FROM recipes ORDER BY created_at DESC, rowid DESC').fetchall()
-            return self.respond([dict(json.loads(r[0]), created_at=r[1]) for r in rows])
+            return self.respond([dict(json.loads(r[0]), tags=category_tags(json.loads(r[0]).get('tags', [])), created_at=r[1]) for r in rows])
         if path == '/api/backup':
             # SQLite's backup API makes a consistent snapshot while the app is open.
             with tempfile.TemporaryDirectory() as folder:
@@ -123,6 +129,19 @@ class Handler(BaseHTTPRequestHandler):
             if not 0 < size <= 15_000_000:
                 raise ValueError('Upload must be smaller than 10 MB.')
             body = json.loads(self.rfile.read(size))
+            if self.path == '/api/import-images':
+                from image_import import read_pages
+                texts, images = read_pages(body.get('images'))
+                result = draft('\n\n'.join(texts))
+                result['source_photos'] = images
+                result['import']['issues'].insert(0, 'Read from photos. Compare quantities, fractions, temperatures, and page order with the photos before saving.')
+                for index, text in enumerate(texts):
+                    if not text:
+                        result['import']['issues'].append(f'No text could be read on page {index + 1}. Retake that page or fill in its text manually.')
+                return self.respond(result)
+            if self.path == '/api/import-photo':
+                from url_import import import_photo
+                return self.respond(import_photo(body.get('url')))
             if self.path == '/api/import-url':
                 from url_import import import_url
                 return self.respond(import_url(body.get('url')))
@@ -150,6 +169,10 @@ class Handler(BaseHTTPRequestHandler):
                     result['import']['issues'].append('No readable text found. This PDF may be scanned. OCR is not available yet; type or paste the recipe while viewing the original.')
                 return self.respond(result)
             if self.path == '/api/recipes':
+                tags = body.get('tags', [])
+                if not isinstance(tags, list) or any(t not in CATEGORIES for t in tags):
+                    raise ValueError('Choose categories from the preset list.')
+                body['tags'] = list(dict.fromkeys(tags))
                 photo = body.get('photo')
                 if photo:
                     if not isinstance(photo, str) or not photo.startswith('data:image/jpeg;base64,') or len(photo)>3_000_000:

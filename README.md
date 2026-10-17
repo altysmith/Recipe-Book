@@ -1,6 +1,6 @@
 # The Little Recipe Box
 
-A local browser recipe book with a SQLite database. Double-click **Start Recipe Book.bat**, then use http://127.0.0.1:8771. The server runs in the background; opening the launcher again reuses it.
+A private browser recipe book with a SQLite database. The hosted copy runs on the Raspberry Pi behind Cloudflare Access. For a separate local copy, double-click **Start Recipe Book.bat**, then use http://127.0.0.1:8771.
 
 Browse/search by title or ingredients, filter categories and favorites, sort, edit recipes, paste text or import PDFs into reviewable drafts, check ingredients, and print a clean recipe page. Directions are optional. Ingredient checkmarks persist on this device until reset; changing the ingredient list clears its old checklist to avoid mismatched checks.
 
@@ -14,10 +14,18 @@ Website imports: Add a recipe -> Website recipe URL -> Import from website. Read
 
 Recipes live in `user_data/recipes.sqlite3`, originals in `user_data/originals`. These and intermediate files are ignored by Git. Canceled imports may leave an original PDF in that folder. The initial sample JSON is a historical import snapshot; the database is authoritative after editing. Use SQLite's backup API for live backups. Do not copy only the database while it is being written.
 
-This folder is currently under OneDrive, so local files may also be synchronized by your OneDrive settings.
+The active source checkout is `C:\Users\erica\Desktop\Codex\Recipe Book`. GitHub contains application source, not the live recipes or original uploads; the Pi's `user_data` is authoritative for the hosted copy.
 
-## Development / later Raspberry Pi move
+To discuss the app in regular ChatGPT, connect its GitHub app to the private `altysmith/Recipe-Book` repository and ask it to inspect `web/index.html`, `web/style.css`, and `web/app.js`. Attach screenshots from your signed-in browser when you want feedback on the actual rendered site. GitHub source access does not grant access through Cloudflare Access or reveal the live recipe collection.
+
+## Development
 
 Python 3.11+ and `pip install -r requirements.txt`; run `python server.py`. The Windows launcher first looks for the bundled Codex Python, then Python on PATH. `RECIPE_DATA_DIR` selects a different data directory. `python -m unittest discover -s tests` uses temporary databases.
 
-The server binds to this computer's loopback interface. Offline reading is implemented; home-screen installation and actual iPhone testing remain ahead. Raspberry Pi deployment still needs a production server, private authentication, HTTPS/domain routing, backups, and explicit network configuration. No hosting or public access is enabled.
+The local server binds to this computer's loopback interface. The Raspberry Pi deployment and its Cloudflare Access configuration are documented in `DEPLOYMENT.md`. Actual iPhone and home-screen testing still needs user confirmation.
+
+## Photo and screenshot imports
+
+Add a recipe -> Photo or screenshot -> choose up to four photos in page order -> Read recipe photos -> review -> Save recipe. Photos are read privately on the server with Tesseract English OCR; no external AI service or API key is used. Clear upright printed pages work best. Headings such as Ingredients and Directions help field recognition. Unfamiliar layouts may need manual corrections; all extracted text and resized source photos remain available in the review and saved record. Check fractions, quantities, temperatures, and completeness. No recipe is saved automatically.
+
+Server setup: install `tesseract-ocr` and `tesseract-ocr-eng` on Debian/Raspberry Pi. Windows needs Tesseract on PATH, or set `RECIPE_TESSERACT` to its executable. Pillow is already installed through pdfplumber. Photo reading requires connectivity. Browser-readable images are resized to 2400 pixels before upload (up to 20 MB per original). If an HEIC photo cannot open in the browser, use a JPEG or PNG screenshot.
