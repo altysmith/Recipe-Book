@@ -77,6 +77,13 @@ class RecipeTests(unittest.TestCase):
             urlopen(self.url+'/originals/../../server.py')
         self.assertEqual(error.exception.code,404)
 
+    def test_fresh_instagram_entry_uses_versioned_shell(self):
+        page=urlopen(self.url+'/instagram').read().decode()
+        self.assertIn('Instagram Reel',page)
+        self.assertIn('/app-v12.js',page)
+        for alias,original in (('/app-v12.js','/app.js'),('/offline-v12.js','/offline.js'),('/style-v12.css','/style.css')):
+            self.assertEqual(urlopen(self.url+alias).read(),urlopen(self.url+original).read())
+
     def test_invalid_save_does_not_write(self):
         with self.assertRaises(HTTPError): self.post('/api/recipes',{'title':'Empty'})
         self.assertEqual(json.load(urlopen(self.url+'/api/recipes')),[])

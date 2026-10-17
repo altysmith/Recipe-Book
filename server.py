@@ -120,7 +120,10 @@ class Handler(BaseHTTPRequestHandler):
             file = (base / path.removeprefix('/originals/')).resolve()
         else:
             base = (ROOT / 'web').resolve()
-            file = (base / ('index.html' if path == '/' else path.lstrip('/'))).resolve()
+            # Versioned shell paths bypass older cache-first service workers.
+            aliases = {'/instagram': 'index.html', '/app-v12.js': 'app.js',
+                       '/offline-v12.js': 'offline.js', '/style-v12.css': 'style.css'}
+            file = (base / aliases.get(path, 'index.html' if path == '/' else path.lstrip('/'))).resolve()
         if not file.is_relative_to(base) or not file.is_file():
             return self.respond({'error': 'Not found'}, 404)
         self.send_bytes(file.read_bytes(), mimetypes.guess_type(file)[0] or 'application/octet-stream')
