@@ -14,9 +14,9 @@ Website imports: Add a recipe -> Website recipe URL -> Import from website. Read
 
 Recipes live in `user_data/recipes.sqlite3`, originals in `user_data/originals`. These and intermediate files are ignored by Git. Canceled imports may leave an original PDF in that folder. The initial sample JSON is a historical import snapshot; the database is authoritative after editing. Use SQLite's backup API for live backups. Do not copy only the database while it is being written.
 
-The active source checkout is `C:\Users\erica\Desktop\Codex\Recipe Book`. GitHub contains application source, not the live recipes or original uploads; the Pi's `user_data` is authoritative for the hosted copy.
+GitHub contains application source, not the live recipes or original uploads; the Pi's `user_data` is authoritative for the hosted copy.
 
-To discuss the app in regular ChatGPT, connect its GitHub app to the private `altysmith/Recipe-Book` repository and ask it to inspect `web/index.html`, `web/style.css`, and `web/app.js`. Attach screenshots from your signed-in browser when you want feedback on the actual rendered site. GitHub source access does not grant access through Cloudflare Access or reveal the live recipe collection.
+To discuss the app in regular ChatGPT, share https://github.com/altysmith/Recipe-Book and ask it to inspect `web/index.html`, `web/style.css`, and `web/app.js`. Attach screenshots from your signed-in browser when you want feedback on the actual rendered site. GitHub source access does not grant access through Cloudflare Access or reveal the live recipe collection.
 
 ## Development
 
