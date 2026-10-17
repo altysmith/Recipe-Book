@@ -40,6 +40,11 @@ const server = http.createServer((request, response) => {
     await page.goto(base);
     await page.waitForFunction(() => !!navigator.serviceWorker.controller);
     assert.equal(await page.locator('body').getAttribute('data-revision'), '1');
+    assert.equal(await page.evaluate(async()=>{
+      const cache=await caches.open('recipe-shell-v15');
+      return !!(await cache.match('/refresh'));
+    }),false,
+      'sign-in recovery must bypass the service worker cache');
 
     revision = 2;
     await page.reload();
