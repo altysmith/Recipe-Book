@@ -32,8 +32,9 @@ const server = http.createServer((request, response) => {
 (async () => {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
-  const browser = await chromium.launch({headless:true, channel:'msedge'});
+  let browser;
   try {
+    browser = await chromium.launch({headless:true, channel:'msedge'});
     const context = await browser.newContext({serviceWorkers:'allow'});
     const page = await context.newPage();
     await page.goto(base);
@@ -58,7 +59,7 @@ const server = http.createServer((request, response) => {
     console.log('Shell online refresh, offline fallback, and edit protection passed');
     await context.close();
   } finally {
-    await browser.close();
+    if (browser) await browser.close();
+    await new Promise(resolve => server.close(resolve));
   }
-  await new Promise(resolve => server.close(resolve));
 })().catch(error => { console.error(error); process.exitCode = 1; });
