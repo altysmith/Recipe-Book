@@ -1,5 +1,5 @@
-const SHELL='recipe-shell-v14';
-const FILES=['/','/instagram','/refresh','/style-v14.css','/app-v14.js','/offline-v14.js','/categories.json','/assets/turkey.png'];
+const SHELL='recipe-shell-v15';
+const FILES=['/','/instagram','/style-v15.css','/app-v15.js','/offline-v15.js','/categories.json','/assets/turkey.png'];
 self.addEventListener('install',event=>event.waitUntil((async()=>{
  const cache=await caches.open(SHELL);await cache.addAll(FILES);await self.skipWaiting();
 })()));

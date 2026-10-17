@@ -55,6 +55,13 @@ const { chromium } = require('playwright');
       assert.deepEqual(errors,[]);
       await page.close();
     }
+    const auth=await browser.newPage();
+    await auth.route('**/api/recipes',route=>route.fulfill({status:302,headers:{Location:'/login'},body:''}));
+    await auth.route('**/refresh',route=>route.fulfill({status:200,contentType:'text/html',body:'<h1>Sign in</h1>'}));
+    await auth.goto(process.env.TEST_URL || 'http://127.0.0.1:8783/');
+    await auth.getByRole('heading',{name:'Sign in'}).waitFor();
+    assert.equal(new URL(auth.url()).pathname,'/refresh');
+    await auth.close();
     console.log('Browser video flow passed at 390px and 1440px');
   } finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1});

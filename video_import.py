@@ -2,6 +2,7 @@
 import http.client
 import ipaddress
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -42,6 +43,7 @@ def health():
     def available(key, name): return bool(shutil.which(os.environ.get(key) or name))
     tools = {'yt_dlp': available('RECIPE_YTDLP', 'yt-dlp'),
              'ffmpeg': available('RECIPE_FFMPEG', 'ffmpeg'),
+             'ffprobe': available('RECIPE_FFPROBE', 'ffprobe'),
              'whisper': available('RECIPE_WHISPER_CLI', 'whisper-cli') and bool(model and Path(model).is_file()),
              'tesseract': available('RECIPE_TESSERACT', 'tesseract')}
     return {'ready': all(tools.values()), 'tools': tools}
@@ -168,8 +170,8 @@ def metadata(url, cancel=None):
     if not isinstance(info, dict) or info.get('_type') in ('playlist', 'url', 'url_transparent'):
         raise VideoError('This link did not resolve to a single video.')
     duration = info.get('duration')
-    if not isinstance(duration, (int, float)) or duration <= 0 or duration > MAX_SECONDS:
-        raise VideoError(f'Only videos with a known duration up to {MAX_SECONDS} seconds can be imported.')
+    if isinstance(duration, (int, float)) and math.isfinite(duration) and duration > MAX_SECONDS:
+        raise VideoError(f'This video is {round(duration)} seconds long; the import limit is {MAX_SECONDS} seconds.')
     formats = info.get('formats') or [info]
     candidates = [f for f in formats if isinstance(f, dict) and isinstance(f.get('url'), str)
                   and f.get('protocol', 'https') in ('https', 'http')
@@ -179,6 +181,33 @@ def metadata(url, cancel=None):
     candidates.sort(key=lambda f: (min(f.get('height') or 0, 720), -(f.get('filesize') or 0)), reverse=True)
     media_target(candidates[0]['url'])
     return info, candidates[0]['url']
+
+
+def verify_duration(video, cancel=None):
+    """Verify the actual downloaded media length; metadata can omit or misstate it."""
+    ffprobe = os.environ.get('RECIPE_FFPROBE') or shutil.which('ffprobe')
+    if not ffprobe: raise VideoError('FFprobe is not installed on the recipe server.')
+    output = checked_run([ffprobe, '-v', 'error', '-show_entries',
+                          'format=duration:stream=duration', '-of', 'json', str(video)],
+                         30, cancel, output_limit=100_000,
+                         failure='The downloaded video could not be inspected.')
+    try: info = json.loads(output)
+    except ValueError: info = {}
+    if not isinstance(info, dict): info = {}
+    container = info.get('format')
+    values = [container.get('duration') if isinstance(container, dict) else None]
+    values.extend(stream.get('duration') for stream in (info.get('streams') or []) if isinstance(stream, dict))
+    durations = []
+    for value in values:
+        try: duration = float(value)
+        except (TypeError, ValueError): continue
+        if math.isfinite(duration) and duration > 0: durations.append(duration)
+    if not durations:
+        raise VideoError('The downloaded video duration could not be verified.')
+    duration = max(durations)
+    if duration > MAX_SECONDS:
+        raise VideoError(f'This video is {round(duration)} seconds long; the import limit is {MAX_SECONDS} seconds.')
+    return duration
 
 
 def download(url, target, cancel=None):
@@ -287,6 +316,7 @@ def import_video(url, progress, cancel=None):
                              ['Audio and on-screen text were skipped because the caption contained ingredients and directions.'])
         video = folder / 'video.mp4'
         download(media, video, cancel)
+        verify_duration(video, cancel)
         progress('transcribing')
         transcript, speech_warning = transcribe(video, folder, cancel)
         progress('extracting_text')

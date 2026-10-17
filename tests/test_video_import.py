@@ -46,13 +46,31 @@ class VideoImportTests(unittest.TestCase):
         with patch('video_import.shutil.which', return_value='yt-dlp'), patch('video_import.public_host'):
             with patch('video_import.checked_run', return_value='not json'):
                 with self.assertRaises(video_import.VideoError): video_import.metadata(URL)
-            for duration in (video_import.MAX_SECONDS + 1, None):
-                with patch('video_import.checked_run', return_value=json.dumps({'duration': duration})):
-                    with self.assertRaises(video_import.VideoError): video_import.metadata(URL)
+            candidate={'url':'https://video.cdninstagram.com/x.mp4','ext':'mp4','protocol':'https'}
+            with patch('video_import.checked_run', return_value=json.dumps({'duration': video_import.MAX_SECONDS + 1,'formats':[candidate]})):
+                with self.assertRaisesRegex(video_import.VideoError, 'import limit'): video_import.metadata(URL)
+            with patch('video_import.checked_run', return_value=json.dumps({'duration': None,'formats':[candidate]})):
+                self.assertIsNone(video_import.metadata(URL)[0]['duration'])
             oversized={'duration': 30, 'formats':[{'url':'https://video.cdninstagram.com/x.mp4',
                        'ext':'mp4', 'protocol':'https', 'filesize':video_import.MAX_BYTES + 1}]}
             with patch('video_import.checked_run', return_value=json.dumps(oversized)):
                 with self.assertRaises(video_import.VideoError): video_import.metadata(URL)
+
+    def test_downloaded_duration_is_verified(self):
+        with patch('video_import.shutil.which', return_value='ffprobe'):
+            for payload in ({'format':{'duration':'42.5'},'streams':[{'duration':'N/A'}]},
+                            {'format':{},'streams':[{'duration':'42.5'}]}):
+                with patch('video_import.checked_run', return_value=json.dumps(payload)):
+                    self.assertEqual(video_import.verify_duration(Path('video.mp4')),42.5)
+            with patch('video_import.checked_run', return_value=json.dumps({'format':{'duration':str(video_import.MAX_SECONDS + 1)}})):
+                with self.assertRaisesRegex(video_import.VideoError, 'import limit'):
+                    video_import.verify_duration(Path('video.mp4'))
+            with patch('video_import.checked_run', return_value='{}'):
+                with self.assertRaisesRegex(video_import.VideoError, 'could not be verified'):
+                    video_import.verify_duration(Path('video.mp4'))
+        with patch('video_import.shutil.which', return_value=None):
+            with self.assertRaisesRegex(video_import.VideoError, 'FFprobe'):
+                video_import.verify_duration(Path('video.mp4'))
 
     def test_process_failure_and_timeout(self):
         with self.assertRaises(video_import.VideoError):
@@ -139,6 +157,7 @@ class VideoImportTests(unittest.TestCase):
             locations.append(target); target.write_bytes(b'video fixture')
         with (patch('video_import.metadata', return_value=(INFO, 'https://video.cdninstagram.com/x.mp4')),
               patch('video_import.download', side_effect=fake_download),
+              patch('video_import.verify_duration', return_value=42.0) as probe,
               patch('video_import.transcribe', return_value=('Chop the garlic. Add olive oil. Cook in a pan.', None)),
               patch('video_import.screen_text', return_value=('3 cloves garlic\n2 tbsp olive oil', None))):
             draft=video_import.import_video(URL, stages.append)
@@ -146,17 +165,47 @@ class VideoImportTests(unittest.TestCase):
         self.assertIn('Audio transcript\nChop the garlic.', draft['import']['raw_text'])
         self.assertIn('On-screen text\n3 cloves garlic', draft['import']['raw_text'])
         self.assertEqual(stages, ['downloading', 'transcribing', 'extracting_text', 'interpreting'])
+        probe.assert_called_once()
         self.assertFalse(locations[0].parent.exists())
 
     def test_incomplete_caption_still_reads_video_for_amounts(self):
         info={**INFO, 'description':'Garlic Sauce\nIngredients:\ngarlic\nDirections:\nAdd garlic to the pan.'}
         with (patch('video_import.metadata', return_value=(info, 'https://video.cdninstagram.com/x.mp4')),
               patch('video_import.download') as download,
+              patch('video_import.verify_duration', return_value=42.0),
               patch('video_import.transcribe', return_value=('Add garlic to the pan.', None)) as transcribe,
               patch('video_import.screen_text', return_value=('3 cloves garlic', None)) as ocr):
             draft=video_import.import_video(URL, lambda stage: None)
         download.assert_called_once(); transcribe.assert_called_once(); ocr.assert_called_once()
         self.assertEqual([item['text'] for item in draft['ingredients']], ['3 cloves garlic'])
+
+    def test_unknown_metadata_duration_uses_probe_before_speech(self):
+        info={**INFO, 'duration':None}
+        holder=[]
+        def fake_download(url, target, cancel):
+            holder.append(target); target.write_bytes(b'bounded video')
+        with (patch('video_import.metadata', return_value=(info, 'https://video.cdninstagram.com/x.mp4')),
+              patch('video_import.download', side_effect=fake_download),
+              patch('video_import.verify_duration', return_value=42.0) as probe,
+              patch('video_import.transcribe', return_value=('Add 2 tbsp olive oil. Stir.', None)) as speech,
+              patch('video_import.screen_text', return_value=('', None))):
+            draft=video_import.import_video(URL, lambda stage: None)
+        self.assertEqual(draft['ingredients'][0]['text'],'2 tbsp olive oil')
+        probe.assert_called_once(); speech.assert_called_once()
+        self.assertFalse(holder[0].parent.exists())
+
+    def test_oversized_duration_stops_before_transcription(self):
+        holder=[]
+        def fake_download(url, target, cancel):
+            holder.append(target); target.write_bytes(b'bounded video')
+        with (patch('video_import.metadata', return_value=({**INFO, 'duration':None}, 'https://video.cdninstagram.com/x.mp4')),
+              patch('video_import.download', side_effect=fake_download),
+              patch('video_import.verify_duration', side_effect=video_import.VideoError('This video is 200 seconds long; the import limit is 180 seconds.')),
+              patch('video_import.transcribe') as speech):
+            with self.assertRaisesRegex(video_import.VideoError, '200 seconds'):
+                video_import.import_video(URL, lambda stage: None)
+        speech.assert_not_called()
+        self.assertFalse(holder[0].parent.exists())
 
     def test_temp_media_removed_after_failure(self):
         holder=[]

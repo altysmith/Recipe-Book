@@ -4,6 +4,22 @@ let activeVideoJob=null;
 let categories=[], recipes=[], current=null, editing={}, favorites=false, trash=false, dirty=false;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function message(text){const inEditor=!$('#editor').hidden;$('#status').textContent=inEditor?'':text;$('#import-status').textContent=inEditor?text:''}
+class AccessRedirect extends Error{}
+const redirected=r=>r.type==='opaqueredirect'||(r.status>=300&&r.status<400);
+async function recoverAccess(error){
+ if($('#editor').hidden===false||dirty)return false;
+ let expired=error instanceof AccessRedirect;
+ if(!expired){
+  try{expired=redirected(await fetch('/health',{redirect:'manual',cache:'no-store',signal:AbortSignal.timeout(5000)}))}catch{}
+ }
+ if(!expired)return false;
+ try{
+  const last=Number(sessionStorage.getItem('recipe-access-recovery')||0);
+  if(Date.now()-last<60000)return false;
+  sessionStorage.setItem('recipe-access-recovery',String(Date.now()));
+ }catch{return false}
+ location.replace('/refresh');return true;
+}
 function connectionNotice(show){
  let notice=$('#connection-notice');
  if(!show){notice?.remove();return}
@@ -13,7 +29,7 @@ function connectionNotice(show){
  const link=document.createElement('a');link.href='/refresh';link.textContent='Reconnect and load the latest website';
  notice.append(label,link);document.querySelector('.offline-bar').after(notice);
 }
-async function api(path,body){if(body&&!navigator.onLine)throw Error('Connect to save or import recipes. Your ingredient checklist still works offline.');const r=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(path==='/api/import-images'?100000:12000)}:{signal:AbortSignal.timeout(5000)});const data=await r.json();if(!r.ok)throw Error(data.error||'Request failed');return data}
+async function api(path,body){if(body&&!navigator.onLine)throw Error('Connect to save or import recipes. Your ingredient checklist still works offline.');const options=body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(path==='/api/import-images'?100000:12000)}:{signal:AbortSignal.timeout(5000)};const r=await fetch(path,{...options,redirect:'manual'});if(redirected(r))throw new AccessRedirect('Recipe Book sign-in is required.');const data=await r.json();if(!r.ok)throw Error(data.error||'Request failed');return data}
 function show(id){if(dirty&&!confirm('Leave without saving your recipe changes?'))return false;if(activeVideoJob)stopVideoJob();importEpoch++;dirty=false;document.body.dataset.view=id;['library','detail','editor'].forEach(x=>$('#'+x).hidden=x!==id);message('');window.scrollTo(0,0);return true}
 function recipeImage(r){if(r.photo&&/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(r.photo))return `<img src="${r.photo}" alt="${esc(r.title)}">`;return r.id==='juicy-smoked-turkey-breast'?'<img src="/assets/turkey.png" alt="Smoked turkey breast from the original recipe">':'<span aria-hidden="true">✳</span>'}
 function pdfLink(r){return r.original_pdf?'/'+r.original_pdf.split('/').map(encodeURIComponent).join('/'):null}
@@ -25,6 +41,7 @@ async function load(){
   if(!Array.isArray(fresh))throw Error('Invalid recipe response');
   recipes=fresh;
   connectionNotice(false);
+  try{sessionStorage.removeItem('recipe-access-recovery')}catch{}
   try{
    await offlineShellReady;
    snapshot={recipes:fresh,savedAt:new Date().toISOString()};
@@ -32,6 +49,7 @@ async function load(){
    $('#offline-state').textContent='Saved on this device · Updated '+new Date(snapshot.savedAt).toLocaleString();
   }catch{$('#offline-state').textContent='Recipes loaded online. Offline storage is unavailable or full.'}
  }catch(error){
+  if(await recoverAccess(error))return;
   connectionNotice(true);
   if(!snapshot)throw Error('No saved recipes on this device yet. Connect once to save your cookbook.');
   recipes=snapshot.recipes;
