@@ -31,6 +31,10 @@ class ImageImportTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 image_import.read_pages(value)
 
+    def test_fraction_common_misreads_are_repaired(self):
+        raw = 'Y cup honey\nYs Cup soy sauce\nY S, cup honey\nY_ Cup soy sauce\n% onion - diced\n1% |b chicken thighs'
+        self.assertEqual(image_import.normalize_fractions(raw), '¼ cup honey\n¼ Cup soy sauce\n¼ cup honey\n¼ Cup soy sauce\n½ onion - diced\n1½ lb chicken thighs')
+
     def test_timeout_is_actionable(self):
         with patch('image_import.shutil.which', return_value='tesseract'), patch('image_import.subprocess.run', side_effect=subprocess.TimeoutExpired('tesseract', 20)):
             with self.assertRaisesRegex(ValueError, 'too long'):

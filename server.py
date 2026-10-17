@@ -73,8 +73,16 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = unquote(urlparse(self.path).path)
+        match = re.fullmatch(r'/api/import-video/jobs/([A-Za-z0-9_-]{20,64})', path)
+        if match:
+            from video_jobs import get
+            try: return self.respond(get(match.group(1), self.headers.get('X-Import-Token')))
+            except ValueError as error: return self.respond({'error': str(error)}, 404)
         if path == '/health':
             return self.respond({'app': 'little-recipe-box', 'version': 1})
+        if path == '/api/import-video/health':
+            from video_import import health
+            return self.respond(health())
         if path == '/api/recipes':
             with connect() as db:
                 rows = db.execute('SELECT document_json,created_at FROM recipes ORDER BY created_at DESC, rowid DESC').fetchall()
@@ -129,6 +137,13 @@ class Handler(BaseHTTPRequestHandler):
             if not 0 < size <= 15_000_000:
                 raise ValueError('Upload must be smaller than 10 MB.')
             body = json.loads(self.rfile.read(size))
+            if self.path == '/api/import-video':
+                from video_jobs import create
+                return self.respond(create(body.get('url')), 202)
+            match = re.fullmatch(r'/api/import-video/jobs/([A-Za-z0-9_-]{20,64})/cancel', self.path)
+            if match:
+                from video_jobs import cancel
+                return self.respond(cancel(match.group(1), self.headers.get('X-Import-Token')))
             if self.path == '/api/import-images':
                 from image_import import read_pages
                 texts, images = read_pages(body.get('images'))

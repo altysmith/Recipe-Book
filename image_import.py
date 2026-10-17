@@ -6,7 +6,23 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import re
 from PIL import Image, ImageOps, UnidentifiedImageError
+
+
+# Tesseract commonly confuses small fraction glyphs with Y or %. Restrict
+# repairs to quantity-shaped ingredient lines so prose is left untouched.
+_FRACTION_LINE_REPLACEMENTS = (
+    (r"^Y(?:[\s_.,'’]*[s5])?[\s_.,'’]*(?=(?:cup\b|cups\b|tbsp\b|tsp\b|tablespoons?\b|teaspoons?\b|oz\b|ounces?\b|lb\b|lbs\b|pounds?\b|onion\b))", '¼ '),
+    (r'^%(?=\s*(?:cup\b|cups\b|tbsp\b|tsp\b|tablespoons?\b|teaspoons?\b|oz\b|ounces?\b|lb\b|lbs\b|pounds?\b|onion\b))', '½'),
+    (r'^(\d+)\s*%\s*\|?b\b', r'\1½ lb'),
+)
+
+
+def normalize_fractions(text):
+    for pattern, replacement in _FRACTION_LINE_REPLACEMENTS:
+        text = re.sub(pattern, replacement, text, flags=re.MULTILINE | re.IGNORECASE)
+    return text
 
 
 def read_pages(pages):
@@ -44,5 +60,5 @@ def read_pages(pages):
                 raise ValueError('Reading took too long. Try one cropped, clear recipe photo at a time.') from error
             except (OSError, subprocess.CalledProcessError) as error:
                 raise ValueError('The server could not read this photo. Check that Tesseract and its English language data are installed.') from error
-            texts.append(result.stdout.decode('utf-8', errors='replace').strip())
+            texts.append(normalize_fractions(result.stdout.decode('utf-8', errors='replace').strip()))
     return texts, ['data:image/jpeg;base64,' + base64.b64encode(content).decode('ascii') for content in normalized]

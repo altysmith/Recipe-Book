@@ -1,0 +1,83 @@
+[
+  {
+    "name": "complete spoken recipe",
+    "caption": "",
+    "transcript": "Today we are making lemon garlic chicken. First cut 1.5 lbs chicken thighs. Toss with 1 tsp smoked paprika and 2 tbsp olive oil. Sear in a pan for about five minutes, flip, then add 1/2 cup chicken broth. Simmer for 10 minutes.",
+    "onscreen": "",
+    "title": "lemon garlic chicken",
+    "ingredients": ["1.5 lbs chicken thighs", "1 tsp smoked paprika", "2 tbsp olive oil", "1/2 cup chicken broth"],
+    "minimum_steps": 5
+  },
+  {
+    "name": "caption only recipe",
+    "caption": "Lemon Pasta\nIngredients:\n1/2 cup olive oil\n2 cloves garlic\nDirections:\nCook pasta.\nAdd oil and garlic.",
+    "transcript": "",
+    "onscreen": "",
+    "title": "Lemon Pasta",
+    "ingredients": ["1/2 cup olive oil", "2 cloves garlic"],
+    "minimum_steps": 2
+  },
+  {
+    "name": "quantities only on screen",
+    "caption": "",
+    "transcript": "Chop the garlic and add it to the pan. Pour in olive oil. Bake at 375 degrees for 20 minutes.",
+    "onscreen": "3 cloves garlic\n2 tbsp olive oil\nBake at 375°F for 20 minutes",
+    "ingredients": ["3 cloves garlic", "2 tbsp olive oil"],
+    "minimum_steps": 2
+  },
+  {
+    "name": "vague quantities",
+    "caption": "",
+    "transcript": "Add a little olive oil and some parmesan. Stir until melted.",
+    "onscreen": "",
+    "ingredients": ["a little olive oil", "some parmesan"],
+    "quantity_warnings": ["olive oil", "parmesan"]
+  },
+  {
+    "name": "conflicting amounts",
+    "caption": "",
+    "transcript": "Add two teaspoons of garlic powder. Mix well.",
+    "onscreen": "2 tablespoons garlic powder",
+    "ingredients": ["two teaspoons of garlic powder"],
+    "conflict": true
+  },
+  {
+    "name": "equivalent spoken and visible amounts",
+    "caption": "",
+    "transcript": "Add two teaspoons of garlic powder. Mix well.",
+    "onscreen": "2 tsp garlic powder",
+    "ingredients": ["two teaspoons of garlic powder"],
+    "conflict": false
+  },
+  {
+    "name": "several ingredients in one sentence",
+    "caption": "",
+    "transcript": "Add 2 tbsp olive oil, 3 cloves garlic, and 1/2 cup broth. Simmer for ten minutes.",
+    "onscreen": "",
+    "ingredients": ["2 tbsp olive oil", "3 cloves garlic", "1/2 cup broth"],
+    "minimum_steps": 2
+  },
+  {
+    "name": "visual measurements ignore promotion and timing",
+    "caption": "",
+    "transcript": "Add olive oil and stir.",
+    "onscreen": "2 tbsp olive oil\n1 million views\n375°F\nCook 20 minutes\n2 tbsp tahini",
+    "ingredients": ["2 tbsp olive oil", "2 tbsp tahini"],
+    "minimum_steps": 1
+  },
+  {
+    "name": "specific visual ingredient replaces generic speech",
+    "caption": "",
+    "transcript": "Add cheese. Cook the chicken.",
+    "onscreen": "1 cup shredded cheese\n1.5 lbs chicken thighs",
+    "ingredients": ["1 cup shredded cheese", "1.5 lbs chicken thighs"],
+    "minimum_steps": 2
+  },
+  {
+    "name": "no recipe",
+    "caption": "Follow me for travel photos.",
+    "transcript": "We drove to the beach and watched the sunset.",
+    "onscreen": "Subscribe for more",
+    "fails": true
+  }
+]

@@ -11,3 +11,13 @@ The app shell and current bundled turkey photo are cached by a service worker. R
 Original PDFs and external source websites are not downloaded for offline reading in this version. Browser storage can be removed by browser settings or device storage pressure. The server database remains authoritative. Offline copies are per browser and origin; moving to the domain requires opening the app online there once.
 
 Increment the service worker shell version when changing bundled application assets. Install caches a full shell before activation; activation removes only obsolete recipe-shell caches. Later authentication must include explicit offline-data removal on sign-out and account isolation.
+
+# Video import follow-ups
+
+- Test a representative public Instagram Reel on the production Raspberry Pi after dependencies are installed; record extraction behavior and processing time. Platform access changes independently of this application.
+- Add a bounded MP4/MOV upload fallback with streamed multipart handling, file signature and duration checks, and the same local extraction pipeline.
+- Improve speech ingredient parsing, visual text relevance and frame timing, and handling of multiple recipes. Keep source conflicts visible.
+- Add a schema-validated optional local language-model provider, and separately consider opt-in hosted AI. Neither is required or configured today.
+- Test other platforms individually before adding their URL patterns and media-host allowlists.
+- Revisit durable jobs only if Pi restarts during imports become a practical issue; current in-process jobs are canceled by restart.
+- Investigate iOS Web Share Target support on the actual iPhone/Safari version before adding a share-sheet flow. Copy and paste is the supported route.

@@ -1,10 +1,11 @@
 const $=s=>document.querySelector(s), form=$('#recipe-form');
 let importEpoch=0;
+let activeVideoJob=null;
 let categories=[], recipes=[], current=null, editing={}, favorites=false, trash=false, dirty=false;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function message(text){const inEditor=!$('#editor').hidden;$('#status').textContent=inEditor?'':text;$('#import-status').textContent=inEditor?text:''}
 async function api(path,body){if(body&&!navigator.onLine)throw Error('Connect to save or import recipes. Your ingredient checklist still works offline.');const r=await fetch(path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(path==='/api/import-images'?100000:12000)}:{signal:AbortSignal.timeout(5000)});const data=await r.json();if(!r.ok)throw Error(data.error||'Request failed');return data}
-function show(id){if(dirty&&!confirm('Leave without saving your recipe changes?'))return false;importEpoch++;dirty=false;document.body.dataset.view=id;['library','detail','editor'].forEach(x=>$('#'+x).hidden=x!==id);message('');window.scrollTo(0,0);return true}
+function show(id){if(dirty&&!confirm('Leave without saving your recipe changes?'))return false;if(activeVideoJob)stopVideoJob();importEpoch++;dirty=false;document.body.dataset.view=id;['library','detail','editor'].forEach(x=>$('#'+x).hidden=x!==id);message('');window.scrollTo(0,0);return true}
 function recipeImage(r){if(r.photo&&/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(r.photo))return `<img src="${r.photo}" alt="${esc(r.title)}">`;return r.id==='juicy-smoked-turkey-breast'?'<img src="/assets/turkey.png" alt="Smoked turkey breast from the original recipe">':'<span aria-hidden="true">✳</span>'}
 function pdfLink(r){return r.original_pdf?'/'+r.original_pdf.split('/').map(encodeURIComponent).join('/'):null}
 async function load(){
@@ -52,7 +53,7 @@ async function detail(id){current=recipes.find(r=>r.id===id);if(!current)return;
 function editor(r={}){if(!show('editor'))return;editing=structuredClone(r);form.reset();resetRecipePages();renderSourcePhotos(r.source_photos);$('#photo-url-status').textContent='';$('#photo-preview').hidden=!r.photo;$('#photo-preview').src=r.photo||'';$('#import-panel').hidden=!!(r.id||r.import);chooseImportMethod('website');form.hidden=!(r.id||r.import);$('#edit-heading').textContent=r.id?'A little fine-tuning.':r.import?'Review your recipe.':'Add a recipe.';['title','servings','total_minutes','author','source_url','notes'].forEach(k=>form.elements[k].value=r[k]??'');['ingredients','instructions'].forEach(k=>form.elements[k].value=(r[k]||[]).map(i=>i.text).join('\n'));$('#category-options').innerHTML='<legend>Categories</legend>'+categories.map(t=>`<label><input type="checkbox" name="category" value="${esc(t)}" ${(r.tags||[]).some(x=>x.toLowerCase()===t.toLowerCase())?'checked':''}>${esc(t)}</label>`).join('');$('#review-notice').hidden=!r.import;$('#review-notice').textContent=(r.import?.issues||[]).join('\n');$('#source-text').textContent=r.import?.raw_text||r.import?.raw_pages?.map(p=>p.text).join('\n\n')||'';$('#edit-pdf').hidden=!pdfLink(r);if(pdfLink(r))$('#edit-pdf').href=pdfLink(r);if(r.import&&!r.id)dirty=true;return true}
 async function extract(body){message('Reading your recipe…');$('#extract').disabled=true;$('#pdf').disabled=true;try{const r=await api('/api/import',body);dirty=false;editor(r);message('Draft ready. Check the title, line breaks, ingredients, and directions before saving.')}catch(e){message(e.message)}finally{$('#extract').disabled=false;$('#pdf').disabled=false}}
 $('#add').onclick=()=>editor();$('.brand').onclick=e=>{e.preventDefault();show('library')};$('#cancel').onclick=()=>show('library');$('#search').oninput=render;$('#sort').onchange=render;$('#tag').onchange=render;$('#favorites').onclick=()=>{favorites=!favorites;$('#favorites').setAttribute('aria-pressed',favorites);render()};$('#extract').onclick=()=>{if(!$('#paste').value.trim()){message('Paste your recipe text first.');$('#paste').focus();return}extract({text:$('#paste').value})};$('#pdf').onchange=async e=>{const file=e.target.files[0];if(!file)return;if(file.size>10_000_000){message('Choose a PDF smaller than 10 MB.');return}const reader=new FileReader();reader.onload=()=>extract({pdf:reader.result.split(',')[1]});reader.onerror=()=>message('Could not read this file.');reader.readAsDataURL(file)};
-form.onsubmit=async e=>{e.preventDefault();const r={...editing};['title','servings','author','source_url','notes'].forEach(k=>r[k]=form.elements[k].value.trim());r.total_minutes=form.elements.total_minutes.value===''?null:Number(form.elements.total_minutes.value);r.tags=[...form.querySelectorAll('[name=category]:checked')].map(x=>x.value);['ingredients','instructions'].forEach(k=>r[k]=form.elements[k].value.split('\n').map(t=>t.trim()).filter(Boolean).map((text,i)=>({...((editing[k]||[]).find(x=>x.text===text)||{}),text,...(k==='instructions'?{number:i+1}:{})})));if(r.import)r.import={...r.import,status:'reviewed'};$('#save').disabled=true;try{const saved=await api('/api/recipes',r);dirty=false;await load();detail(saved.id);message('Recipe saved to your recipe book.')}catch(e){message(e.message)}finally{$('#save').disabled=false}};
+form.onsubmit=async e=>{e.preventDefault();const r={...editing};['title','servings','author','source_url','notes'].forEach(k=>r[k]=form.elements[k].value.trim());r.total_minutes=form.elements.total_minutes.value===''?null:Number(form.elements.total_minutes.value);r.tags=[...form.querySelectorAll('[name=category]:checked')].map(x=>x.value);['ingredients','instructions'].forEach(k=>r[k]=form.elements[k].value.split('\n').map(t=>t.trim()).filter(Boolean).map((text,i)=>({...((editing[k]||[]).find(x=>x.text===text)||{}),text,...(k==='instructions'?{number:i+1}:{})})));if(r.import){r.import={...r.import,status:'reviewed'};if(r.import.method==='instagram_reel')delete r.import.raw_text}$('#save').disabled=true;try{const saved=await api('/api/recipes',r);dirty=false;await load();detail(saved.id);message('Recipe saved to your recipe book.')}catch(e){message(e.message)}finally{$('#save').disabled=false}};
 load().catch(e=>message('Could not load the recipe book: '+e.message));
 if(document.modelContext?.registerTool){
  const lifecycle=new AbortController();
@@ -135,7 +136,42 @@ $('#download-photo').onclick=async()=>{
 };
 
 function chooseImportMethod(method){document.querySelectorAll('[data-method]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.method===method)));document.querySelectorAll('[data-import-pane]').forEach(p=>p.hidden=p.dataset.importPane!==method);form.hidden=method!=='manual';}
-document.querySelectorAll('[data-method]').forEach(b=>b.onclick=()=>{chooseImportMethod(b.dataset.method);message('')});
+document.querySelectorAll('[data-method]').forEach(b=>b.onclick=()=>{if(activeVideoJob&&b.dataset.method!=='video')stopVideoJob();chooseImportMethod(b.dataset.method);message('')});
+
+function stopVideoJob(){
+ const job=activeVideoJob;activeVideoJob=null;$('#cancel-video').hidden=true;$('#import-video').disabled=false;
+ if(job)fetch(`/api/import-video/jobs/${job.id}/cancel`,{method:'POST',headers:{'Content-Type':'application/json','X-Import-Token':job.token},body:'{}',keepalive:true}).catch(()=>{});
+}
+$('#cancel-video').onclick=()=>{stopVideoJob();importEpoch++;message('Video import canceled.');};
+window.addEventListener('pagehide',()=>{if(activeVideoJob)stopVideoJob()});
+$('#import-video').onclick=async()=>{
+ const input=$('#video-url'),button=$('#import-video');
+ if(!input.value.trim()||!input.checkValidity()){input.reportValidity();message('Paste a complete Instagram Reel URL.');return;}
+ if(!navigator.onLine){message('Connect to import a video. Your saved recipes still work offline.');return;}
+ button.disabled=true;message('Checking video link…');
+ const epoch=importEpoch;
+ try{
+  const created=await api('/api/import-video',{url:input.value.trim()});
+  if(epoch!==importEpoch)return;
+  activeVideoJob={id:created.job_id,token:created.token};$('#cancel-video').hidden=false;
+  const labels={queued:'Waiting for the video importer…',downloading:'Retrieving video and caption…',transcribing:'Extracting audio and transcribing speech…',extracting_text:'Reading on-screen text…',interpreting:'Organizing recipe…'};
+  const deadline=Date.now()+20*60*1000;
+  while(activeVideoJob&&epoch===importEpoch&&Date.now()<deadline){
+   const response=await fetch(`/api/import-video/jobs/${activeVideoJob.id}`,{headers:{'X-Import-Token':activeVideoJob.token},cache:'no-store',signal:AbortSignal.timeout(10000)});
+   const job=await response.json();if(!response.ok)throw Error(job.error||'Video import status could not be read.');
+   if(!activeVideoJob||epoch!==importEpoch)return;
+   if(job.state==='completed'){
+    activeVideoJob=null;$('#cancel-video').hidden=true;button.disabled=false;
+    dirty=false;editor(job.result);message('Video draft ready. Check the evidence and edit any missing details before saving.');return;
+   }
+   if(job.state==='failed'||job.state==='canceled')throw Error(job.error||'Video import canceled.');
+   message(labels[job.state]||'Processing video…');
+   await new Promise(resolve=>setTimeout(resolve,2000));
+  }
+  if(activeVideoJob&&epoch===importEpoch)throw Error('Video import timed out. Try a shorter Reel.');
+ }catch(error){if(epoch===importEpoch)message(error.message||'Video import failed.');}
+ finally{if(epoch===importEpoch&&activeVideoJob)stopVideoJob();button.disabled=false;}
+};
 
 let recipePages=[];
 function renderSourcePhotos(pages){

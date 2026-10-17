@@ -8,6 +8,8 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 import sys
+import time
+from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import server
 
@@ -83,6 +85,31 @@ class RecipeTests(unittest.TestCase):
         result=self.post('/api/recipes',{'title':'Seasoning', 'ingredients':[{'text':'1 tsp salt'}], 'instructions':[]})
         self.assertEqual(result['instructions'],[])
         self.assertEqual(json.load(urlopen(self.url+'/api/recipes'))[0]['title'],'Seasoning')
+
+    def test_video_job_draft_requires_explicit_save(self):
+        source='https://www.instagram.com/reel/AbCd12345/'
+        candidate={'title':'Pasta','ingredients':[{'text':'1 cup pasta'}],
+                   'instructions':[{'text':'Boil pasta.','number':1}], 'tags':[],
+                   'source_url':source,'author':'cookalice',
+                   'import':{'method':'instagram_reel','status':'awaiting_user_review','raw_text':'Audio transcript\nBoil pasta.','issues':[]}}
+        with patch('video_jobs.import_video', return_value=candidate):
+            created=self.post('/api/import-video',{'url':source})
+            for _ in range(100):
+                request=Request(self.url+'/api/import-video/jobs/'+created['job_id'],headers={'X-Import-Token':created['token']})
+                result=json.load(urlopen(request))
+                if result['state']=='completed': break
+                time.sleep(.01)
+        self.assertEqual(result['result']['source_url'],source)
+        self.assertEqual(json.load(urlopen(self.url+'/api/recipes')),[])
+        with self.assertRaises(HTTPError) as error:
+            urlopen(self.url+'/api/import-video/jobs/'+created['job_id'])
+        self.assertEqual(error.exception.code,404)
+        candidate['title']='My pasta';candidate['tags']=['Pasta'];candidate['import']['status']='reviewed'
+        self.post('/api/recipes',candidate)
+        reopened=json.load(urlopen(self.url+'/api/recipes'))[0]
+        self.assertEqual(reopened['title'],'My pasta')
+        self.assertEqual(reopened['tags'],['Pasta'])
+        self.assertEqual(reopened['source_url'],source)
 
     def test_backup_trash_and_photo(self):
         import zipfile
