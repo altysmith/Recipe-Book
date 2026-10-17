@@ -6,9 +6,11 @@ Browse/search by title or ingredients, filter categories and favorites, sort, ed
 
 Open online once and wait for “Saved on this device.” Recipes and the app shell then reopen offline, including the bundled recipe photo. Use Refresh saved recipes to download current records. Imports, edits, original PDFs, and external websites require a connection. Offline snapshots and checkmarks use browser storage, which browser settings or storage pressure can remove. They are separate from the server database and are not shared between devices. See NEXT_STEPS.md for URL import planning.
 
+Website updates now load from the server on an online page refresh; the saved shell is used when offline. A service worker update refreshes a browsing page automatically. If an editor is open, the app offers a **Load website update** button after you finish your changes. If an older browser cache still shows a previous release, open `https://recipes.altylab.com/refresh` once while online. This does not clear saved recipes or ingredient checklists.
+
 PDF import currently extracts embedded text and recognizes common section headings. It does not use OCR or AI, infer missing fields, or reliably resolve columns, multi-recipe files, line wrapping, and printed headers. Review drafts against the retained original PDF before saving. Scanned PDFs retain the original but require manual text entry. The turkey sample was manually visually verified.
 
-Website imports: Add a recipe -> Website recipe URL -> Import from website. Reads Schema.org Recipe JSON-LD into an editable draft, including ingredient-only recipes. Multiple recipes present a chooser. Source attribution is retained. Pages that block requests or lack supported recipe data require pasting text or a print-page link. No recipe is saved until you review and select Save recipe. Refresh twice after an app update if the previous offline shell is still displayed.
+Website imports: Add a recipe -> Website recipe URL -> Import from website. Reads Schema.org Recipe JSON-LD into an editable draft, including ingredient-only recipes. Multiple recipes present a chooser. Source attribution is retained. Pages that block requests or lack supported recipe data require pasting text or a print-page link. No recipe is saved until you review and select Save recipe.
 
 ## Data and privacy
 

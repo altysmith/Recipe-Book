@@ -80,9 +80,18 @@ class RecipeTests(unittest.TestCase):
     def test_fresh_instagram_entry_uses_versioned_shell(self):
         page=urlopen(self.url+'/instagram').read().decode()
         self.assertIn('Instagram Reel',page)
-        self.assertIn('/app-v12.js',page)
-        for alias,original in (('/app-v12.js','/app.js'),('/offline-v12.js','/offline.js'),('/style-v12.css','/style.css')):
+        self.assertEqual(urlopen(self.url+'/refresh').read().decode(),urlopen(self.url+'/').read().decode())
+        self.assertIn('/app-v13.js',page)
+        for alias,original in (('/app-v13.js','/app.js'),('/offline-v13.js','/offline.js'),('/style-v13.css','/style.css')):
             self.assertEqual(urlopen(self.url+alias).read(),urlopen(self.url+original).read())
+
+    def test_shell_updates_from_network_without_caching_recipe_api(self):
+        worker=urlopen(self.url+'/sw.js').read().decode()
+        self.assertIn("recipe-shell-v13",worker)
+        self.assertIn("'/refresh'",worker)
+        self.assertIn('await fetch(event.request',worker)
+        self.assertIn('await cache.match(url.pathname)',worker)
+        self.assertNotIn("'/api/recipes'",worker)
 
     def test_invalid_save_does_not_write(self):
         with self.assertRaises(HTTPError): self.post('/api/recipes',{'title':'Empty'})

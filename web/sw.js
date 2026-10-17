@@ -1,5 +1,5 @@
-const SHELL='recipe-shell-v12';
-const FILES=['/','/instagram','/style-v12.css','/app-v12.js','/offline-v12.js','/style.css','/app.js','/offline.js','/categories.json','/assets/turkey.png'];
+const SHELL='recipe-shell-v13';
+const FILES=['/','/instagram','/refresh','/style-v13.css','/app-v13.js','/offline-v13.js','/categories.json','/assets/turkey.png'];
 self.addEventListener('install',event=>event.waitUntil((async()=>{
  const cache=await caches.open(SHELL);await cache.addAll(FILES);await self.skipWaiting();
 })()));
@@ -14,7 +14,18 @@ self.addEventListener('fetch',event=>{
  if(!FILES.includes(url.pathname))return;
  event.respondWith((async()=>{
   const cache=await caches.open(SHELL);
-  const saved=await cache.match(url.pathname);
-  return saved||fetch(event.request);
+  // Fetch current shell files online; use the saved copy when offline or slow.
+  // Recipe API responses are never stored in this cache.
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),5000);
+  try{
+   const response=await fetch(event.request,{signal:controller.signal});
+   if(response.ok)try{await cache.put(url.pathname,response.clone())}catch{} // A full cache must not break online browsing.
+   return response;
+  }catch(error){
+   const saved=await cache.match(url.pathname);
+   if(saved)return saved;
+   throw error;
+  }finally{clearTimeout(timeout)}
  })());
 });
