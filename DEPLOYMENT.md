@@ -1,5 +1,11 @@
 # Recipe Book deployment
 
+## 2026-10-21 weekly menu release
+
+Commit `5c1776c` deployed the Saturday–Friday weekly menu, Snacks, Lunches, Sweet treats, and the compact saved-menu view. The live app serves `recipe-shell-v23`. The pre-release database backup is `/home/ealtenho/recipe-book-backups/recipes-20261021T141525Z.zip`; the code rollback archive is `/home/ealtenho/recipe-release-saved-menu-20261021/before-code.tar.gz`. Hash-matched copies of both are in `C:\Users\erica\Desktop\Codex\Recipe Book Backups`.
+
+All 54 tests passed locally and in a Pi staging copy. The Pi service and tunnel are active, and the weekly-menu API and v23 assets respond. The 13 recipe rows and original PDF match the pre-release backup byte-for-byte by digest; SQLite integrity is `ok`. A read-only browser check through the Pi origin passed at 390px and 1440px with no overflow or page errors. At 390px, a sample menu supplied only to the browser verified the saved view and Edit menu without writing production data. The public hostname redirects unauthenticated visitors to Cloudflare Access. Authenticated phone interaction remains unverified.
+
 ## 2026-10-21 ChatGPT paste release
 
 Follow-up commit `34ff19d` restores **Paste or type text** and adds **Paste ChatGPT recipe** as a separate Add a recipe method with its own paste box. It uses `recipe-shell-v21`. The pre-release database backup is `/home/ealtenho/recipe-book-backups/recipes-20261021T104554Z.zip` (copied off the Pi and verified); the code rollback archive is `/home/ealtenho/recipe-release-two-paste-20261021/before-code.tar.gz`. All 52 local tests and the shell browser test passed. A 390px browser check through the Pi origin used both methods and reached editable drafts with no page errors or horizontal overflow. The Pi focused import test passed; 12 saved recipes and SQLite integrity `ok` remained unchanged. Authenticated iPhone interaction remains unverified.
