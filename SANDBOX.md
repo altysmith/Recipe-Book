@@ -2,6 +2,8 @@
 
 This branch is for testing the weekly menu on a laptop. It does not change the Raspberry Pi app or its recipes. The menu starts on Saturday and has blank fields for Saturday through Friday, Snacks, Lunches, and Sweet treats.
 
+After saving a week, the menu appears as a compact read-only note. Choose **Edit menu** to change it; a new blank week opens directly in the editor.
+
 Python 3.10 or newer is required. If setup says Python is unavailable, install Python 3.12 with `winget install --id Python.Python.3.12 -e --source winget --scope user`, open a new PowerShell window, and run setup again. The script checks that Python actually runs; the Windows Store app alias alone is not an installation.
 
 ## Use the checkout already on this laptop

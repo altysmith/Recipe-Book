@@ -105,6 +105,19 @@ function renderFilterState(count){
 const menuDayNames=['Saturday','Sunday','Monday','Tuesday','Wednesday','Thursday','Friday'];
 function saturdayOf(date){const day=new Date(date.getFullYear(),date.getMonth(),date.getDate());day.setDate(day.getDate()-(day.getDay()+1)%7);return day}
 function menuKey(date){return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`}
+function menuHasContent(menu){return [...menu.days,menu.snacks,menu.lunches,menu.sweet_treats].some(value=>value.trim())}
+function renderMenuDisplay(menu){
+ const dayRows=menuDayNames.map((name,index)=>{
+  const meal=menu.days[index].trim();
+  return `<div class="menu-display-day"><h3>${name}</h3><p>${meal?esc(meal):'<span class="menu-empty">—</span>'}</p></div>`;
+ }).join('');
+ const extraRows=[['Snacks',menu.snacks],['Lunches',menu.lunches],['Sweet treats',menu.sweet_treats]].map(([title,value])=>{
+  const lines=value.split(/\r?\n/).map(line=>line.trim()).filter(Boolean);
+  return `<section class="menu-display-extra"><h3>${title}</h3>${lines.length?lines.map(line=>`<p>${esc(line)}</p>`).join(''):'<p class="menu-empty">—</p>'}</section>`;
+ }).join('');
+ $('#menu-display-content').innerHTML=`<div class="menu-display-days">${dayRows}</div><div class="menu-display-extras">${extraRows}</div>`;
+ $('#menu-display').hidden=false;$('#menu-form').hidden=true;$('#menu-intro').hidden=true;
+}
 async function openMenu(week=saturdayOf(new Date())){
  if(menuDirty&&!confirm('Leave without saving your weekly menu?'))return;
  if($('#menu').hidden&&!show('menu'))return;
@@ -112,7 +125,7 @@ async function openMenu(week=saturdayOf(new Date())){
  menuWeek=week;menuDirty=false;$('#menu-status').textContent='Loading menu…';
  const end=new Date(week);end.setDate(end.getDate()+6);
  $('#menu-heading').textContent=`${week.toLocaleDateString(undefined,{month:'short',day:'numeric'})} – ${end.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}`;
- $('#menu-form').hidden=true;
+ $('#menu-form').hidden=true;$('#menu-display').hidden=true;
  try{
   const menu=await api('/api/weekly-menu/'+menuKey(week));
   if(menuKey(menuWeek)!==menu.week_start)return;
@@ -120,15 +133,19 @@ async function openMenu(week=saturdayOf(new Date())){
   $('#menu-snacks').value=menu.snacks;
   $('#menu-lunches').value=menu.lunches;
   $('#menu-sweet-treats').value=menu.sweet_treats;
-  $('#menu-form').hidden=false;$('#menu-status').textContent='';
+  if(menuHasContent(menu))renderMenuDisplay(menu);
+  else{$('#menu-form').hidden=false;$('#menu-intro').hidden=false}
+  $('#menu-status').textContent='';
  }catch(error){$('#menu-status').textContent=error.message||'Could not load this menu.'}
 }
+$('#menu-edit').onclick=()=>{$('#menu-display').hidden=true;$('#menu-form').hidden=false;$('#menu-intro').hidden=false;$('#menu-status').textContent='';$('#menu-days textarea').focus()};
 $('#menu-form').addEventListener('input',()=>{menuDirty=true;$('#menu-status').textContent='Unsaved changes'});
 $('#menu-form').onsubmit=async event=>{
  event.preventDefault();const button=$('#menu-form button[type=submit]');button.disabled=true;$('#menu-status').textContent='Saving…';
  const days=Array(7).fill('');
  $('#menu-days').querySelectorAll('textarea').forEach(input=>{days[Number(input.dataset.day)]=input.value});
- try{await api('/api/weekly-menu',{week_start:menuKey(menuWeek),days,snacks:$('#menu-snacks').value,lunches:$('#menu-lunches').value,sweet_treats:$('#menu-sweet-treats').value});menuDirty=false;$('#menu-status').textContent='Saved for this week.'}
+ const weekKey=menuKey(menuWeek);
+ try{const saved=await api('/api/weekly-menu',{week_start:weekKey,days,snacks:$('#menu-snacks').value,lunches:$('#menu-lunches').value,sweet_treats:$('#menu-sweet-treats').value});if(menuKey(menuWeek)!==weekKey)return;menuDirty=false;if(menuHasContent(saved))renderMenuDisplay(saved);$('#menu-status').textContent='Saved for this week.'}
  catch(error){$('#menu-status').textContent=error.message||'Could not save the menu.'}
  finally{button.disabled=false}
 };

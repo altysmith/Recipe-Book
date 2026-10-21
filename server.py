@@ -179,6 +179,7 @@ class Handler(BaseHTTPRequestHandler):
             base = (ROOT / 'web').resolve()
             # Versioned shell paths bypass older cache-first service workers.
             aliases = {'/instagram': 'index.html', '/refresh': 'index.html',
+                       '/app-v23.js': 'app.js', '/offline-v23.js': 'offline.js', '/style-v23.css': 'style.css',
                        '/app-v22.js': 'app.js', '/offline-v22.js': 'offline.js', '/style-v22.css': 'style.css',
                        '/app-v12.js': 'app.js', '/offline-v12.js': 'offline.js', '/style-v12.css': 'style.css',
                        '/app-v13.js': 'app.js', '/offline-v13.js': 'offline.js', '/style-v13.css': 'style.css',

@@ -43,5 +43,16 @@ h1,h2,.card-body h3{font-family:Arial,Helvetica,sans-serif;letter-spacing:-.6px}
 .menu-extras label{font-weight:700}
 .menu-save{display:flex;align-items:center;gap:15px;flex-wrap:wrap}
 .menu-save span{font-size:14px;color:#59665b}
+#menu-status:not(:empty){max-width:850px;margin:14px 0;padding:10px 14px;background:#e7ebdc;border-radius:8px}
+#menu-display{max-width:850px;margin:18px 0;padding:20px 24px;background:#fffaf1;border:1px solid #ded8ca;border-radius:16px}
+.menu-display-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:12px;border-bottom:1px solid #e4dccd}
+.menu-display-actions span{font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:#64705f}
+.menu-display-day{display:grid;grid-template-columns:120px minmax(0,1fr);gap:14px;padding:12px 0;border-bottom:1px solid #e9e2d5}
+.menu-display-day h3,.menu-display-extra h3{margin:0;font-size:15px;color:var(--forest)}
+.menu-display-day p,.menu-display-extra p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5}
+.menu-empty{color:#969b91}
+.menu-display-extras{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;padding-top:18px}
+.menu-display-extra p{margin-top:7px}
 @media(max-width:700px){.header-actions #menu-link{display:none}#menu{padding-top:20px}.menu-days,.menu-extras{grid-template-columns:1fr}.menu-week{justify-content:space-between}.menu-week h2{min-width:0;font-size:17px}.menu-save .primary{width:100%}.phone-nav button{min-width:0;flex:1;padding:3px 2px}}
-@media print{#menu .menu-week button,#menu-today,#menu .menu-save{display:none!important}.menu-days,.menu-extras{grid-template-columns:repeat(2,1fr)}.menu-day,.menu-extras label{break-inside:avoid}}
+@media(max-width:700px){#menu-display{padding:16px}.menu-display-day{grid-template-columns:96px minmax(0,1fr);gap:8px}.menu-display-extras{grid-template-columns:1fr;gap:14px}}
+@media print{#menu .menu-week button,#menu-today,#menu .menu-save,#menu-edit,#menu-status{display:none!important}.menu-days,.menu-extras{grid-template-columns:repeat(2,1fr)}.menu-day,.menu-extras label{break-inside:avoid}#menu-display{border:0;padding:0;max-width:none}}
