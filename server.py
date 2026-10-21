@@ -1,5 +1,6 @@
 """Local recipe book. Run python server.py; data stays in user_data."""
 import argparse
+from datetime import date
 from contextlib import contextmanager
 import base64
 import io
@@ -29,6 +30,7 @@ def connect():
     DATA.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(DATA / 'recipes.sqlite3')
     db.execute('CREATE TABLE IF NOT EXISTS recipes (id TEXT PRIMARY KEY, title TEXT NOT NULL, document_json TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)')
+    db.execute('CREATE TABLE IF NOT EXISTS weekly_menus (week_start TEXT PRIMARY KEY, document_json TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)')
     try:
         with db:
             yield db
@@ -116,6 +118,16 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = unquote(urlparse(self.path).path)
+        menu_match = re.fullmatch(r'/api/weekly-menu/(\d{4}-\d{2}-\d{2})', path)
+        if menu_match:
+            try:
+                week = date.fromisoformat(menu_match.group(1))
+                if week.weekday() != 5: raise ValueError()
+            except ValueError:
+                return self.respond({'error': 'Choose a Saturday to start the week.'}, 400)
+            with connect() as db:
+                row = db.execute('SELECT document_json FROM weekly_menus WHERE week_start=?', (week.isoformat(),)).fetchone()
+            return self.respond(json.loads(row[0]) if row else {'week_start': week.isoformat(), 'days': ['' for _ in range(7)], 'snacks': '', 'lunches': '', 'sweet_treats': ''})
         match = re.fullmatch(r'/api/import-video/jobs/([A-Za-z0-9_-]{20,64})', path)
         if match:
             from video_jobs import get
@@ -141,15 +153,17 @@ class Handler(BaseHTTPRequestHandler):
                         if backup.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
                             raise RuntimeError('Backup integrity check failed')
                         records = [json.loads(row[0]) for row in backup.execute('SELECT document_json FROM recipes')]
+                        menus = [json.loads(row[0]) for row in backup.execute('SELECT document_json FROM weekly_menus ORDER BY week_start')]
                     finally:
                         backup.close()
                 output = io.BytesIO()
                 with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as archive:
                     archive.write(target, 'recipes.sqlite3')
                     archive.writestr('recipes.json', json.dumps(records, ensure_ascii=False, indent=2))
+                    archive.writestr('weekly-menus.json', json.dumps(menus, ensure_ascii=False, indent=2))
                     for file in (DATA / 'originals').glob('*'):
                         if file.is_file(): archive.write(file, 'originals/' + file.name)
-                    archive.writestr('RESTORE.txt', 'Close Recipe Book. Keep a copy of your current user_data folder. Extract recipes.sqlite3 and originals into user_data, then restart. recipes.json is a portable text export. Photos are included in recipe records. Trash is retained. Browser ingredient checkmarks are device-specific and are not in this backup.')
+                    archive.writestr('RESTORE.txt', 'Close Recipe Book. Keep a copy of your current user_data folder. Extract recipes.sqlite3 and originals into user_data, then restart. recipes.json and weekly-menus.json are portable text exports. Photos are included in recipe records. Trash and weekly menus are retained. Browser ingredient checkmarks are device-specific and are not in this backup.')
                 content = output.getvalue()
             self.send_response(200)
             self.send_header('Content-Type', 'application/zip')
@@ -165,6 +179,7 @@ class Handler(BaseHTTPRequestHandler):
             base = (ROOT / 'web').resolve()
             # Versioned shell paths bypass older cache-first service workers.
             aliases = {'/instagram': 'index.html', '/refresh': 'index.html',
+                       '/app-v22.js': 'app.js', '/offline-v22.js': 'offline.js', '/style-v22.css': 'style.css',
                        '/app-v12.js': 'app.js', '/offline-v12.js': 'offline.js', '/style-v12.css': 'style.css',
                        '/app-v13.js': 'app.js', '/offline-v13.js': 'offline.js', '/style-v13.css': 'style.css',
                        '/app-v14.js': 'app.js', '/offline-v14.js': 'offline.js', '/style-v14.css': 'style.css',
@@ -263,6 +278,23 @@ class Handler(BaseHTTPRequestHandler):
                 with connect() as db:
                     db.execute('INSERT INTO recipes(id,title,document_json) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title, document_json=excluded.document_json, updated_at=CURRENT_TIMESTAMP', (body['id'], body['title'], json.dumps(body, ensure_ascii=False)))
                 return self.respond(body)
+            if self.path == '/api/weekly-menu':
+                if not isinstance(body, dict): raise ValueError('Invalid menu.')
+                week = date.fromisoformat(body.get('week_start', ''))
+                if week.weekday() != 5: raise ValueError('Choose a Saturday to start the week.')
+                days = body.get('days')
+                if not isinstance(days, list) or len(days) != 7 or any(not isinstance(day, str) or len(day) > 1000 for day in days):
+                    raise ValueError('Enter up to 1,000 characters per day.')
+                extras = {}
+                for field in ('snacks', 'lunches', 'sweet_treats'):
+                    value = body.get(field, '')
+                    if not isinstance(value, str) or len(value) > 2000:
+                        raise ValueError('Keep each extra list under 2,000 characters.')
+                    extras[field] = value.strip()
+                menu = {'week_start': week.isoformat(), 'days': [day.strip() for day in days], **extras}
+                with connect() as db:
+                    db.execute('INSERT INTO weekly_menus(week_start,document_json) VALUES(?,?) ON CONFLICT(week_start) DO UPDATE SET document_json=excluded.document_json,updated_at=CURRENT_TIMESTAMP', (week.isoformat(), json.dumps(menu, ensure_ascii=False)))
+                return self.respond(menu)
             self.respond({'error': 'Not found'}, 404)
         except (ValueError, TypeError, KeyError) as error:
             self.respond({'error': str(error)}, 400)

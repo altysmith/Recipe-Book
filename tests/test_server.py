@@ -1,4 +1,6 @@
 import json
+import sqlite3
+import zipfile
 import base64
 import io
 import tempfile
@@ -33,6 +35,34 @@ class RecipeTests(unittest.TestCase):
         headers={'Content-Type':'application/json'}
         if origin: headers['Origin']=origin
         return json.load(urlopen(Request(self.url+path, json.dumps(data).encode(), headers)))
+
+    def test_weekly_menu_save_reopen_and_backup(self):
+        week = '2026-10-17'
+        empty = json.load(urlopen(self.url+'/api/weekly-menu/'+week))
+        self.assertEqual(empty['days'], ['' for _ in range(7)])
+        empty['days'][0] = 'Pork butt + baked beans + baked potatoes'
+        empty['snacks'] = 'Cucumbers + carrots and hummus\nGrapes'
+        empty['lunches'] = 'Crispy grilled chicken + broccoli + rice'
+        empty['sweet_treats'] = 'Ice cream bars'
+        saved = self.post('/api/weekly-menu', empty)
+        self.assertEqual(json.load(urlopen(self.url+'/api/weekly-menu/'+week)), saved)
+        self.assertEqual(json.load(urlopen(self.url+'/api/weekly-menu/2026-10-24'))['days'][0], '')
+        with zipfile.ZipFile(io.BytesIO(urlopen(self.url+'/api/backup').read())) as archive:
+            self.assertEqual(json.loads(archive.read('weekly-menus.json'))[0], saved)
+            with sqlite3.connect(':memory:') as restored:
+                restored.deserialize(archive.read('recipes.sqlite3'))
+                self.assertEqual(restored.execute('SELECT count(*) FROM weekly_menus').fetchone()[0], 1)
+
+    def test_weekly_menu_rejects_invalid_week_and_shape(self):
+        with self.assertRaises(HTTPError) as error:
+            self.post('/api/weekly-menu', {'week_start': '2026-10-19', 'days': ['']*7})
+        self.assertEqual(error.exception.code, 400)
+        with self.assertRaises(HTTPError) as error:
+            self.post('/api/weekly-menu', {'week_start': '2026-10-17', 'days': ['']*6})
+        self.assertEqual(error.exception.code, 400)
+        with self.assertRaises(HTTPError) as error:
+            urlopen(self.url+'/api/weekly-menu/2026-10-19')
+        self.assertEqual(error.exception.code, 400)
 
     def test_save_update_reopen_preserves_source(self):
         recipe={'title':'Test soup', 'ingredients':[{'text':'1 cup water'}], 'instructions':[{'text':'Warm.'}], 'import':{'raw_text':'Original'}, 'original_pdf':'originals/test.pdf'}
@@ -104,20 +134,23 @@ class RecipeTests(unittest.TestCase):
         page=urlopen(self.url+'/instagram').read().decode()
         self.assertIn('Instagram Reel',page)
         self.assertEqual(urlopen(self.url+'/refresh').read().decode(),urlopen(self.url+'/').read().decode())
-        self.assertIn('/app-v21.js',page)
-        for alias,original in (('/app-v21.js','/app.js'),('/offline-v21.js','/offline.js'),('/style-v21.css','/style.css')):
+        self.assertIn('/app-v22.js',page)
+        for alias,original in (('/app-v22.js','/app.js'),('/offline-v22.js','/offline.js'),('/style-v22.css','/style.css')):
             self.assertEqual(urlopen(self.url+alias).read(),urlopen(self.url+original).read())
 
     def test_home_screen_metadata_and_icons_are_served(self):
         page=urlopen(self.url+'/').read().decode()
+        self.assertIn('<title>Lolo’s Kitchen</title>',page)
+        self.assertIn('<span>Lolo’s<br>Kitchen</span>',page)
+        self.assertIn('name="apple-mobile-web-app-title" content="Lolo’s Kitchen"',page)
         self.assertIn('rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"',page)
         self.assertIn('rel="manifest" href="/manifest.webmanifest"',page)
         self.assertIn('name="apple-mobile-web-app-capable" content="yes"',page)
         with urlopen(self.url+'/manifest.webmanifest') as response:
             self.assertEqual(response.headers.get_content_type(),'application/manifest+json')
             manifest=json.load(response)
-        self.assertEqual(manifest['name'],'The Little Recipe Box')
-        self.assertEqual(manifest['short_name'],'Recipe Box')
+        self.assertEqual(manifest['name'],'Lolo’s Kitchen')
+        self.assertEqual(manifest['short_name'],'Lolo’s Kitchen')
         self.assertEqual((manifest['start_url'],manifest['scope'],manifest['display']),('/','/','standalone'))
         for path,size in (('/apple-touch-icon.png',180),('/icon-192.png',192),('/icon-512.png',512)):
             with urlopen(self.url+path) as response:
@@ -129,7 +162,7 @@ class RecipeTests(unittest.TestCase):
 
     def test_shell_updates_from_network_without_caching_recipe_api(self):
         worker=urlopen(self.url+'/sw.js').read().decode()
-        self.assertIn("recipe-shell-v21",worker)
+        self.assertIn("recipe-shell-v22",worker)
         self.assertNotIn("'/refresh'",worker)
         self.assertIn('await fetch(event.request',worker)
         self.assertIn('await cache.match(url.pathname)',worker)

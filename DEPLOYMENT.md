@@ -106,3 +106,7 @@ Check that the new Video link appears after the service worker updates. First te
 If import says a binary is missing, check the service environment and executable permissions with `systemctl cat recipe-book.service` and `journalctl -u recipe-book.service -n 100`. Instagram can reject unauthenticated download despite a public browser page; do not add cookies or bypass access controls. If transcription times out, try a shorter video or benchmark a smaller model. If OCR is empty, inspect the video text size and Tesseract English installation.
 
 Rollback: preserve `user_data` and the verified backup, restore the prior **code** archive over source files only, restore the previous systemd drop-in if changed, reload systemd, and restart `recipe-book.service`. Keep the new backup until code and saved recipes are verified after rollback. No database migration is needed.
+
+## Weekly menu
+
+The weekly menu stores one Saturday-starting plan per week in the existing `user_data/recipes.sqlite3` database. The `weekly_menus` table is created automatically on startup. The normal `/api/backup` ZIP includes the table in `recipes.sqlite3` and a readable `weekly-menus.json` export. Back up the live database before installing this release. Keep `user_data` in place when updating code; a code-only rollback leaves saved menus available for a later release.

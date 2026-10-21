@@ -15,12 +15,12 @@ window.offlineShellReady = (async()=>{
  // browsing view so its new HTML and scripts appear without another manual refresh.
  // Keep an open editor intact and offer a deliberate update instead.
  navigator.serviceWorker.addEventListener('controllerchange',()=>{
-  if(document.querySelector('#editor')?.hidden!==false){location.reload();return}
+  if(document.querySelector('#editor')?.hidden!==false&&document.querySelector('#menu')?.hidden!==false){location.reload();return}
   if(document.querySelector('#shell-update'))return;
   const notice=document.createElement('div');
   notice.id='shell-update';notice.className='offline-bar';notice.setAttribute('role','status');
   const label=document.createElement('span');
-  label.textContent='A website update is ready. Save or finish your recipe before loading it.';
+  label.textContent='A website update is ready. Save your changes before loading it.';
   const button=document.createElement('button');
   button.type='button';button.textContent='Load website update';button.onclick=()=>location.reload();
   notice.append(label,button);
