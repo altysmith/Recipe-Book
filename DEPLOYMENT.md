@@ -1,5 +1,11 @@
 # Recipe Book deployment
 
+## 2026-10-21 paired mobile header buttons
+
+Commit `471829b` places **Weekly menu** and **+ Add a recipe** side by side in the phone header. At 370px and below, the two buttons share a second header row. The shell is `recipe-shell-v25`. The pre-release data backup is `/home/ealtenho/recipe-book-backups/recipes-20261021T220000Z.zip`; the prior code is `/home/ealtenho/recipe-release-mobile-header-20261021/before-code.tar.gz`. Hash-matched copies of both are in `C:\Users\erica\Desktop\Codex\Recipe Book Backups`.
+
+All 54 tests passed locally and in Pi staging. Browser checks through the Pi origin at 390px and 320px found both header buttons visible and side by side, with no horizontal overflow or page errors. The service and tunnel are active; v25 assets and `/menu` respond. SQLite integrity is `ok`, the 13 recipe rows and original PDF retain their pre-release digests, and the saved weekly menu remains present. The public hostname still redirects unauthenticated requests to Cloudflare Access. The user's physical phone remains the final visual check.
+
 ## 2026-10-21 mobile menu entry repair
 
 Commit `419b597` deployed a direct `/menu` page that bypasses older service-worker shell caches, opens the weekly menu, and shows a Weekly menu button in the mobile header. `recipe-shell-v24` also keeps an open menu in view when a worker update arrives. The pre-release data backup is `/home/ealtenho/recipe-book-backups/recipes-20261021T215347Z.zip`; the code rollback archive is `/home/ealtenho/recipe-release-mobile-menu-20261021/before-code.tar.gz`. Both have hash-matched off-device copies in `C:\Users\erica\Desktop\Codex\Recipe Book Backups`.
