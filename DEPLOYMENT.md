@@ -1,5 +1,11 @@
 # Recipe Book deployment
 
+## 2026-10-21 mobile menu entry repair
+
+Commit `419b597` deployed a direct `/menu` page that bypasses older service-worker shell caches, opens the weekly menu, and shows a Weekly menu button in the mobile header. `recipe-shell-v24` also keeps an open menu in view when a worker update arrives. The pre-release data backup is `/home/ealtenho/recipe-book-backups/recipes-20261021T215347Z.zip`; the code rollback archive is `/home/ealtenho/recipe-release-mobile-menu-20261021/before-code.tar.gz`. Both have hash-matched off-device copies in `C:\Users\erica\Desktop\Codex\Recipe Book Backups`.
+
+All 54 tests passed in Pi staging, and the local weekly-menu browser check passed at 390px and 1440px. A phone-width, touch-enabled browser check through the Pi origin opened `/menu` directly, showed the header and bottom menu controls, found all seven day fields, and had no horizontal overflow or page errors. The Pi service and tunnel are active, `/menu` and v24 assets respond, 13 recipe rows and the original PDF retain their pre-release digests, and SQLite integrity is `ok`. The public `/menu` route redirects unauthenticated requests to Cloudflare Access. The user's actual phone screen still needs confirmation.
+
 ## 2026-10-21 weekly menu release
 
 Commit `5c1776c` deployed the Saturday–Friday weekly menu, Snacks, Lunches, Sweet treats, and the compact saved-menu view. The live app serves `recipe-shell-v23`. The pre-release database backup is `/home/ealtenho/recipe-book-backups/recipes-20261021T141525Z.zip`; the code rollback archive is `/home/ealtenho/recipe-release-saved-menu-20261021/before-code.tar.gz`. Hash-matched copies of both are in `C:\Users\erica\Desktop\Codex\Recipe Book Backups`.

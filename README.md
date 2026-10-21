@@ -2,6 +2,8 @@
 
 A private browser recipe book with a SQLite database. The hosted copy runs on the Raspberry Pi behind Cloudflare Access. For a separate local copy, double-click **Start Recipe Book.bat**, then use http://127.0.0.1:8771.
 
+On a phone, open `https://recipes.altylab.com/menu` to go straight to the weekly menu. The current mobile page also has **Weekly menu** in the header and **Menu** in the bottom navigation. The direct link fetches the current page when an older saved app screen is still open.
+
 Browse/search by title or ingredients, filter categories and favorites, sort, edit recipes, paste text or import PDFs into reviewable drafts, check ingredients, and print a clean recipe page. Directions are optional. Ingredient checkmarks persist on this device until reset; changing the ingredient list clears its old checklist to avoid mismatched checks.
 
 Open online once and wait for “Saved on this device.” Recipes and the app shell then reopen offline, including the bundled recipe photo. Use Refresh saved recipes to download current records. Imports, edits, original PDFs, and external websites require a connection. Offline snapshots and checkmarks use browser storage, which browser settings or storage pressure can remove. They are separate from the server database and are not shared between devices. See NEXT_STEPS.md for URL import planning.
