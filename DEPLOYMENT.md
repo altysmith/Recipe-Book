@@ -1,5 +1,11 @@
 # Recipe Book deployment
 
+## 2026-10-21 ChatGPT paste release
+
+Commit `99c13c5` is live on the Pi with `recipe-shell-v18`. It adds the **Paste ChatGPT recipe** shortcut and improves text draft parsing; the previously prepared Home Screen icons and manifest are included. The live database was backed up to `/home/ealtenho/recipe-book-backups/recipes-20261021T101329Z.zip` and copied to `C:\Users\erica\Desktop\Codex\Recipe Book Backups`. The ZIP passed integrity checks, and its SQLite database contained 12 recipes with `PRAGMA integrity_check = ok`. Prior application code is archived at `/home/ealtenho/recipe-release-chatgpt-20261021/before-code.tar.gz`; restore it into the app directory and restart `recipe-book.service` to roll back code without replacing `user_data`.
+
+The local 52-test suite and shell browser test passed. The Pi focused import test passed. A live draft import returned the expected title, ingredients, steps, time, servings, and notes; recipe count stayed 12 and database integrity remained `ok`. A 390px browser check through the Pi origin opened the paste shortcut and review draft with no page errors or horizontal overflow. The public URL still redirects anonymous requests to Cloudflare Access. Authenticated iPhone interaction was not tested.
+
 Live URL: https://recipes.altylab.com
 
 Pi: ealtenho@192.168.10.4. Source is installed at /home/ealtenho/recipe-book from the private GitHub main archive. User data was transferred separately using the SQLite backup export and compared exactly after restore (1 recipe at deployment).
