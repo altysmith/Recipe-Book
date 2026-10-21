@@ -22,6 +22,11 @@ const {chromium} = require('playwright');
    const page=await browser.newPage({viewport:{width,height:844}});
    const errors=[];page.on('pageerror',error=>errors.push(error.message));
    await page.goto(`http://127.0.0.1:${port}/`);
+   if(width===390){
+    const menuButton=await page.locator('#menu-link').boundingBox(),addButton=await page.locator('#add').boundingBox();
+    assert.ok(menuButton&&addButton);
+    assert.ok(Math.abs(menuButton.y-addButton.y)<2);
+   }
    await (width===390?page.locator('[data-nav="menu"]'):page.locator('#menu-link')).click();
    if(width===1440)await page.locator('#menu-next').click();
    await page.locator('#menu-days textarea').first().waitFor();
@@ -67,6 +72,14 @@ const {chromium} = require('playwright');
   assert.equal(await mobile.locator('.menu-display-day').count(),7);
   assert.equal(await mobile.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await mobile.close();
+  const narrow=await browser.newPage({viewport:{width:320,height:700}});
+  await narrow.goto(`http://127.0.0.1:${port}/menu`);
+  await narrow.locator('#menu').waitFor({state:'visible'});
+  const narrowMenu=await narrow.locator('#menu-link').boundingBox(),narrowAdd=await narrow.locator('#add').boundingBox();
+  assert.ok(narrowMenu&&narrowAdd);
+  assert.ok(Math.abs(narrowMenu.y-narrowAdd.y)<2);
+  assert.equal(await narrow.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await narrow.close();
   console.log('Weekly menu browser check passed at 390px and 1440px.');
  }finally{
   await browser?.close();server.kill();
