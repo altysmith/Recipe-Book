@@ -26,7 +26,7 @@ To discuss the app in regular ChatGPT, share https://github.com/altysmith/Recipe
 
 Python 3.11+ and `pip install -r requirements.txt`; run `python server.py`. The Windows launcher first looks for the bundled Codex Python, then Python on PATH. `RECIPE_DATA_DIR` selects a different data directory. `python -m unittest discover -s tests` uses temporary databases.
 
-For a recipe from ChatGPT, copy the full response, choose **Paste ChatGPT recipe** in the cookbook, paste it, and select **Create recipe draft**. The importer uses the recipe title and section headings, reads time and servings when present, and puts suggestions and cautions in notes. Review the draft and choose **Save recipe** when it is correct.
+For a recipe from ChatGPT, copy the full response, choose **Add a recipe → Paste ChatGPT recipe**, paste it, and select **Create recipe draft**. The importer uses the recipe title and section headings, reads time and servings when present, and puts suggestions and cautions in notes. Review the draft and choose **Save recipe** when it is correct.
 
 The local server binds to this computer's loopback interface. The Raspberry Pi deployment and its Cloudflare Access configuration are documented in `DEPLOYMENT.md`. Actual iPhone and home-screen testing still needs user confirmation.
 

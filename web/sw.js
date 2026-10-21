@@ -1,5 +1,5 @@
-const SHELL='recipe-shell-v19';
-const FILES=['/','/instagram','/style-v19.css','/app-v19.js','/offline-v19.js','/categories.json','/assets/turkey.png','/manifest.webmanifest','/apple-touch-icon.png','/icon-192.png','/icon-512.png'];
+const SHELL='recipe-shell-v20';
+const FILES=['/','/instagram','/style-v20.css','/app-v20.js','/offline-v20.js','/categories.json','/assets/turkey.png','/manifest.webmanifest','/apple-touch-icon.png','/icon-192.png','/icon-512.png'];
 self.addEventListener('install',event=>event.waitUntil((async()=>{
  const cache=await caches.open(SHELL);await cache.addAll(FILES);await self.skipWaiting();
 })()));

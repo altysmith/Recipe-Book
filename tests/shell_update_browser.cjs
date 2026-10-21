@@ -13,19 +13,19 @@ const server = http.createServer((request, response) => {
   response.setHeader('Cache-Control', 'no-store');
   if (['/', '/instagram', '/refresh'].includes(name)) {
     response.setHeader('Content-Type', 'text/html');
-    return response.end(`<!doctype html><html><body data-revision="${revision}"><main><div class="offline-bar">Recipes</div><section id="editor" hidden></section></main><script src="/offline-v19.js" defer></script></body></html>`);
+    return response.end(`<!doctype html><html><body data-revision="${revision}"><main><div class="offline-bar">Recipes</div><section id="editor" hidden></section></main><script src="/offline-v20.js" defer></script></body></html>`);
   }
   if (name === '/sw.js') {
     response.setHeader('Content-Type', 'text/javascript');
     return response.end(fs.readFileSync(path.join(web, 'sw.js')) + `\n// test revision ${workerRevision}\n`);
   }
-  if (name === '/offline-v19.js') {
+  if (name === '/offline-v20.js') {
     response.setHeader('Content-Type', 'text/javascript');
     return response.end(fs.readFileSync(path.join(web, 'offline.js')));
   }
   if (name === '/categories.json') return response.end('[]');
   if (name === '/assets/turkey.png') return response.end('image');
-  if (['/app-v19.js', '/style-v19.css'].includes(name)) return response.end('');
+  if (['/app-v20.js', '/style-v20.css'].includes(name)) return response.end('');
   if (['/manifest.webmanifest', '/apple-touch-icon.png', '/icon-192.png', '/icon-512.png'].includes(name)) return response.end(fs.readFileSync(path.join(web, name.slice(1))));
   response.statusCode = 404; response.end('Not found');
 });
@@ -42,7 +42,7 @@ const server = http.createServer((request, response) => {
     await page.waitForFunction(() => !!navigator.serviceWorker.controller);
     assert.equal(await page.locator('body').getAttribute('data-revision'), '1');
     assert.equal(await page.evaluate(async()=>{
-      const cache=await caches.open('recipe-shell-v19');
+      const cache=await caches.open('recipe-shell-v20');
       return !!(await cache.match('/refresh'));
     }),false,
       'sign-in recovery must bypass the service worker cache');
