@@ -7,6 +7,7 @@ This branch is for testing the weekly menu on a laptop. It does not change the R
 Open PowerShell in `C:\Users\erica\Desktop\Codex\Recipe Book Weekly Menu Sandbox`, then run:
 
 ```powershell
+.\setup-sandbox.ps1
 .\run-sandbox.ps1
 ```
 
@@ -17,6 +18,7 @@ Open <http://127.0.0.1:8783/> and choose **Weekly menu**. Test recipes and menus
 ```powershell
 git clone --branch sandbox/weekly-menu --single-branch https://github.com/altysmith/Recipe-Book.git "Recipe Book Weekly Menu Sandbox"
 cd "Recipe Book Weekly Menu Sandbox"
+.\setup-sandbox.ps1
 .\run-sandbox.ps1
 ```
 

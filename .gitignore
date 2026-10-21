@@ -1,4 +1,5 @@
 user_data/
 sandbox_data/
+.venv/
 tmp/
 __pycache__/
