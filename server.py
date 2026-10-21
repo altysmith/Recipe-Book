@@ -173,7 +173,8 @@ class Handler(BaseHTTPRequestHandler):
                        '/app-v17.js': 'app.js', '/offline-v17.js': 'offline.js', '/style-v17.css': 'style.css',
                        '/app-v18.js': 'app.js', '/offline-v18.js': 'offline.js', '/style-v18.css': 'style.css',
                        '/app-v19.js': 'app.js', '/offline-v19.js': 'offline.js', '/style-v19.css': 'style.css',
-                       '/app-v20.js': 'app.js', '/offline-v20.js': 'offline.js', '/style-v20.css': 'style.css'}
+                       '/app-v20.js': 'app.js', '/offline-v20.js': 'offline.js', '/style-v20.css': 'style.css',
+                       '/app-v21.js': 'app.js', '/offline-v21.js': 'offline.js', '/style-v21.css': 'style.css'}
             file = (base / aliases.get(path, 'index.html' if path == '/' else path.lstrip('/'))).resolve()
         if not file.is_relative_to(base) or not file.is_file():
             return self.respond({'error': 'Not found'}, 404)
