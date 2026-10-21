@@ -1,4 +1,4 @@
-# The Little Recipe Box
+# Lolo’s Kitchen
 
 A private browser recipe book with a SQLite database. The hosted copy runs on the Raspberry Pi behind Cloudflare Access. For a separate local copy, double-click **Start Recipe Book.bat**, then use http://127.0.0.1:8771.
 
