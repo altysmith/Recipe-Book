@@ -53,6 +53,6 @@ h1,h2,.card-body h3{font-family:Arial,Helvetica,sans-serif;letter-spacing:-.6px}
 .menu-empty{color:#969b91}
 .menu-display-extras{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;padding-top:18px}
 .menu-display-extra p{margin-top:7px}
-@media(max-width:700px){.header-actions #menu-link{display:none}#menu{padding-top:20px}.menu-days,.menu-extras{grid-template-columns:1fr}.menu-week{justify-content:space-between}.menu-week h2{min-width:0;font-size:17px}.menu-save .primary{width:100%}.phone-nav button{min-width:0;flex:1;padding:3px 2px}}
+@media(max-width:700px){header .header-actions .primary{display:none}.header-actions #menu-link{display:block;font-size:14px;padding:9px 12px}#menu{padding-top:20px}.menu-days,.menu-extras{grid-template-columns:1fr}.menu-week{justify-content:space-between}.menu-week h2{min-width:0;font-size:17px}.menu-save .primary{width:100%}.phone-nav button{min-width:0;flex:1;padding:3px 2px}}
 @media(max-width:700px){#menu-display{padding:16px}.menu-display-day{grid-template-columns:96px minmax(0,1fr);gap:8px}.menu-display-extras{grid-template-columns:1fr;gap:14px}}
 @media print{#menu .menu-week button,#menu-today,#menu .menu-save,#menu-edit,#menu-status{display:none!important}.menu-days,.menu-extras{grid-template-columns:repeat(2,1fr)}.menu-day,.menu-extras label{break-inside:avoid}#menu-display{border:0;padding:0;max-width:none}}

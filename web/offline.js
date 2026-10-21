@@ -15,7 +15,13 @@ window.offlineShellReady = (async()=>{
  // browsing view so its new HTML and scripts appear without another manual refresh.
  // Keep an open editor intact and offer a deliberate update instead.
  navigator.serviceWorker.addEventListener('controllerchange',()=>{
-  if(document.querySelector('#editor')?.hidden!==false&&document.querySelector('#menu')?.hidden!==false){location.reload();return}
+  const menuOpen=document.querySelector('#menu')?.hidden===false;
+  const editingMenu=menuOpen&&document.querySelector('#menu-form')?.hidden===false;
+  if(document.querySelector('#editor')?.hidden!==false&&!editingMenu){
+   if(menuOpen&&location.pathname!=='/menu')location.replace('/menu');
+   else location.reload();
+   return;
+  }
   if(document.querySelector('#shell-update'))return;
   const notice=document.createElement('div');
   notice.id='shell-update';notice.className='offline-bar';notice.setAttribute('role','status');

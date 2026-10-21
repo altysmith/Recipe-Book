@@ -60,6 +60,13 @@ const {chromium} = require('playwright');
    assert.deepEqual(errors,[]);
    await page.close();
   }
+  const mobile=await browser.newPage({viewport:{width:390,height:844}});
+  await mobile.goto(`http://127.0.0.1:${port}/menu`);
+  await mobile.locator('#menu-display').waitFor({state:'visible'});
+  assert.equal(await mobile.locator('#menu-link').isVisible(),true);
+  assert.equal(await mobile.locator('.menu-display-day').count(),7);
+  assert.equal(await mobile.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await mobile.close();
   console.log('Weekly menu browser check passed at 390px and 1440px.');
  }finally{
   await browser?.close();server.kill();
