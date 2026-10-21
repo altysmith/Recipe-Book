@@ -8,6 +8,7 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 import sys
+import struct
 import time
 from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -56,6 +57,28 @@ class RecipeTests(unittest.TestCase):
         self.assertEqual(draft['ingredients'][0]['text'],'1 cup water')
         self.assertEqual(draft['instructions'][0]['text'],'Warm water.')
 
+    def test_chatgpt_recipe_paste(self):
+        text=('That’s Smithfield Korean BBQ Seasoned Pork Loin Strips.\n\n'
+              'Korean BBQ Pork Rice Bowls\n\nHigh protein30 minutes2–3 servings\n\n'
+              'Ingredients\nPork and rice\n* 1 package (16 oz) pork strips\n* 1 cup jasmine rice\n'
+              'Optional Korean BBQ drizzle\n* 2 tbsp tamari\n\nInstructions\n'
+              '1. Prepare the rice\nCook jasmine rice according to package instructions.\n\n'
+              '2. Cook the pork\nSear until cooked through.\n\n'
+              'A couple of suggestions\n* For leftovers: refrigerate promptly.\n\n'
+              'One important consideration: Check the pork allergen label.')
+        draft=self.post('/api/import',{'text':text})
+        self.assertEqual(draft['title'],'Korean BBQ Pork Rice Bowls')
+        self.assertEqual(draft['total_minutes'],30)
+        self.assertEqual(draft['servings'],'2-3')
+        self.assertEqual([item['text'] for item in draft['ingredients']],
+                         ['1 package (16 oz) pork strips','1 cup jasmine rice','2 tbsp tamari'])
+        self.assertEqual(draft['instructions'][0]['text'],
+                         'Prepare the rice Cook jasmine rice according to package instructions.')
+        self.assertIn('Check the pork allergen label',draft['notes'])
+        self.assertEqual(draft['import']['raw_text'],text)
+        with server.connect() as db:
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM recipes').fetchone()[0],0)
+
     def test_pdf_original_retained(self):
         from reportlab.pdfgen import canvas
         buffer=io.BytesIO()
@@ -81,13 +104,32 @@ class RecipeTests(unittest.TestCase):
         page=urlopen(self.url+'/instagram').read().decode()
         self.assertIn('Instagram Reel',page)
         self.assertEqual(urlopen(self.url+'/refresh').read().decode(),urlopen(self.url+'/').read().decode())
-        self.assertIn('/app-v16.js',page)
-        for alias,original in (('/app-v16.js','/app.js'),('/offline-v16.js','/offline.js'),('/style-v16.css','/style.css')):
+        self.assertIn('/app-v18.js',page)
+        for alias,original in (('/app-v18.js','/app.js'),('/offline-v18.js','/offline.js'),('/style-v18.css','/style.css')):
             self.assertEqual(urlopen(self.url+alias).read(),urlopen(self.url+original).read())
+
+    def test_home_screen_metadata_and_icons_are_served(self):
+        page=urlopen(self.url+'/').read().decode()
+        self.assertIn('rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"',page)
+        self.assertIn('rel="manifest" href="/manifest.webmanifest"',page)
+        self.assertIn('name="apple-mobile-web-app-capable" content="yes"',page)
+        with urlopen(self.url+'/manifest.webmanifest') as response:
+            self.assertEqual(response.headers.get_content_type(),'application/manifest+json')
+            manifest=json.load(response)
+        self.assertEqual(manifest['name'],'The Little Recipe Box')
+        self.assertEqual(manifest['short_name'],'Recipe Box')
+        self.assertEqual((manifest['start_url'],manifest['scope'],manifest['display']),('/','/','standalone'))
+        for path,size in (('/apple-touch-icon.png',180),('/icon-192.png',192),('/icon-512.png',512)):
+            with urlopen(self.url+path) as response:
+                self.assertEqual(response.headers.get_content_type(),'image/png')
+                png=response.read()
+            self.assertEqual(png[:8],b'\x89PNG\r\n\x1a\n')
+            self.assertEqual(struct.unpack('>II',png[16:24]),(size,size))
+        self.assertEqual({icon['src'] for icon in manifest['icons']},{'/icon-192.png','/icon-512.png'})
 
     def test_shell_updates_from_network_without_caching_recipe_api(self):
         worker=urlopen(self.url+'/sw.js').read().decode()
-        self.assertIn("recipe-shell-v16",worker)
+        self.assertIn("recipe-shell-v18",worker)
         self.assertNotIn("'/refresh'",worker)
         self.assertIn('await fetch(event.request',worker)
         self.assertIn('await cache.match(url.pathname)',worker)

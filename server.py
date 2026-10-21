@@ -37,23 +37,66 @@ def connect():
 
 def draft(text):
     result = {'title': '', 'ingredients': [], 'instructions': [], 'tags': [], 'notes': '', 'import': {'status': 'awaiting_user_review', 'raw_text': text, 'issues': ['Check reading order, quantities, and completeness against the original before saving.']}}
+    lines = [line.strip() for line in text.splitlines()]
+    headings = {'ingredients', 'ingredient list', 'what you need'}
+    first_ingredients = next((i for i, line in enumerate(lines) if line.lower().rstrip(':') in headings), None)
+    if first_ingredients is not None:
+        # ChatGPT often puts an introduction before the actual recipe title.
+        preface = [line for line in lines[:first_ingredients] if line]
+        for line in reversed(preface):
+            if re.search(r'\d+\s*(?:minutes?|mins?|servings?)\b', line, re.I):
+                continue
+            result['title'] = line.lstrip('# ').strip('* ')[:200]
+            break
+        metadata = ' '.join(preface)
+        minutes = re.search(r'(\d+)\s*(?:minutes?|mins?)', metadata, re.I)
+        servings = re.search(r'(\d+(?:\s*[-–]\s*\d+)?)\s*servings?\b', metadata, re.I)
+        if minutes:
+            result['total_minutes'] = int(minutes.group(1))
+        if servings:
+            result['servings'] = servings.group(1).replace('–', '-').replace(' ', '')
     section = None
-    for line in text.splitlines():
-        line = line.strip()
+    current_step = None
+    notes = []
+    ingredient_lines = lines[first_ingredients + 1:] if first_ingredients is not None else lines
+    ingredient_lines = ingredient_lines[:next((i for i, line in enumerate(ingredient_lines)
+                                              if line.lower().rstrip(':') in ('instructions', 'directions', 'method', 'preparation', 'steps')),
+                                             len(ingredient_lines))]
+    bulleted_ingredients = any(re.match(r'^[*•●-]\s+', line) for line in ingredient_lines)
+    for line in lines:
         if not line:
             continue
         heading = line.lower().rstrip(':')
-        if heading in ('ingredients', 'ingredient list', 'what you need'):
+        if heading in headings:
             section = 'ingredients'; continue
         if heading in ('instructions', 'directions', 'method', 'preparation', 'steps'):
             section = 'instructions'; continue
-        if heading in ('notes', 'nutrition', 'nutrition facts'):
-            section = None; continue
-        if section:
-            # Preserve line boundaries: arbitrary PDF wrapping is intentionally reviewed by the user.
-            result[section].append({'text': re.sub(r'^(?:[•●]|\d+[.)])\s*', '', line)})
+        if heading in ('notes', 'nutrition', 'nutrition facts') or heading.startswith(('a couple of suggestions', 'one important consideration')):
+            section = 'notes'; current_step = None
+            if heading not in ('notes', 'nutrition', 'nutrition facts'):
+                notes.append(line)
+            continue
+        if section == 'ingredients':
+            if re.match(r'^[*•●-]\s+', line):
+                result['ingredients'].append({'text': re.sub(r'^[*•●-]\s+', '', line)})
+            elif not bulleted_ingredients or re.match(r'^\d', line):
+                result['ingredients'].append({'text': line})
+            # Subheadings such as "Pork and rice" and "Optional drizzle" organize
+            # the source, but are not ingredients themselves.
+        elif section == 'instructions':
+            match = re.match(r'^\d+[.)]\s*(.*)', line)
+            if match:
+                current_step = {'text': match.group(1)}
+                result['instructions'].append(current_step)
+            elif current_step is not None:
+                current_step['text'] += (' ' if current_step['text'] else '') + line
+            else:
+                result['instructions'].append({'text': line})
+        elif section == 'notes':
+            notes.append(re.sub(r'^[*•●-]\s+', '', line))
         elif not result['title']:
             result['title'] = line[:200]
+    result['notes'] = '\n'.join(notes)
     if not result['ingredients'] or not result['instructions']:
         result['import']['issues'].append('Some sections could not be recognized. Fill them from the source text; nothing has been discarded from the original.')
     return result
@@ -126,7 +169,9 @@ class Handler(BaseHTTPRequestHandler):
                        '/app-v13.js': 'app.js', '/offline-v13.js': 'offline.js', '/style-v13.css': 'style.css',
                        '/app-v14.js': 'app.js', '/offline-v14.js': 'offline.js', '/style-v14.css': 'style.css',
                        '/app-v15.js': 'app.js', '/offline-v15.js': 'offline.js', '/style-v15.css': 'style.css',
-                       '/app-v16.js': 'app.js', '/offline-v16.js': 'offline.js', '/style-v16.css': 'style.css'}
+                       '/app-v16.js': 'app.js', '/offline-v16.js': 'offline.js', '/style-v16.css': 'style.css',
+                       '/app-v17.js': 'app.js', '/offline-v17.js': 'offline.js', '/style-v17.css': 'style.css',
+                       '/app-v18.js': 'app.js', '/offline-v18.js': 'offline.js', '/style-v18.css': 'style.css'}
             file = (base / aliases.get(path, 'index.html' if path == '/' else path.lstrip('/'))).resolve()
         if not file.is_relative_to(base) or not file.is_file():
             return self.respond({'error': 'Not found'}, 404)

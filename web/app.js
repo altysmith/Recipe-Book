@@ -171,6 +171,7 @@ $('#download-photo').onclick=async()=>{
 };
 
 function chooseImportMethod(method){document.querySelectorAll('[data-method]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.method===method)));document.querySelectorAll('[data-import-pane]').forEach(p=>p.hidden=p.dataset.importPane!==method);form.hidden=method!=='manual';}
+$('#paste-chatgpt').onclick=()=>{if(editor()){chooseImportMethod('text');$('#paste').focus()}};
 document.querySelectorAll('[data-method]').forEach(b=>b.onclick=()=>{if(activeVideoJob&&b.dataset.method!=='video')stopVideoJob();chooseImportMethod(b.dataset.method);message('')});
 
 function stopVideoJob(){
