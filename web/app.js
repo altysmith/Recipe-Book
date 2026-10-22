@@ -3,6 +3,7 @@ let importEpoch=0;
 let activeVideoJob=null;
 let categories=[], recipes=[], current=null, editing={}, favorites=false, trash=false, dirty=false;
 let menuWeek=null, menuDirty=false;
+let groceryItems=[], groceryBusy=false;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function message(text){const inEditor=!$('#editor').hidden;$('#status').textContent=inEditor?'':text;$('#import-status').textContent=inEditor?text:''}
 class AccessRedirect extends Error{}
@@ -31,7 +32,7 @@ function connectionNotice(show){
  notice.append(label,link);document.querySelector('.offline-bar').after(notice);
 }
 async function api(path,body){if(body&&!navigator.onLine)throw Error('Connect to save or import recipes. Your ingredient checklist still works offline.');const options=body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(path==='/api/import-images'?100000:12000)}:{signal:AbortSignal.timeout(5000)};const r=await fetch(path,{...options,redirect:'manual'});if(redirected(r))throw new AccessRedirect('Lolo’s Kitchen sign-in is required.');const data=await r.json();if(!r.ok)throw Error(data.error||'Request failed');return data}
-function show(id){if(dirty&&!confirm('Leave without saving your recipe changes?'))return false;if(menuDirty&&id!=='menu'&&!confirm('Leave without saving your weekly menu?'))return false;if(activeVideoJob)stopVideoJob();importEpoch++;dirty=false;if(id!=='menu')menuDirty=false;document.body.dataset.view=id;['library','detail','editor','menu'].forEach(x=>$('#'+x).hidden=x!==id);if(id==='editor'||id==='detail')document.querySelectorAll('[data-nav]').forEach(b=>b.removeAttribute('aria-current'));message('');window.scrollTo(0,0);return true}
+function show(id){if(dirty&&!confirm('Leave without saving your recipe changes?'))return false;if(menuDirty&&id!=='menu'&&!confirm('Leave without saving your weekly menu?'))return false;if(activeVideoJob)stopVideoJob();importEpoch++;dirty=false;if(id!=='menu')menuDirty=false;document.body.dataset.view=id;['library','detail','editor','menu','groceries'].forEach(x=>$('#'+x).hidden=x!==id);if(id==='editor'||id==='detail')document.querySelectorAll('[data-nav]').forEach(b=>b.removeAttribute('aria-current'));message('');window.scrollTo(0,0);return true}
 function recipeImage(r){if(r.photo&&/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(r.photo))return `<img src="${r.photo}" alt="${esc(r.title)}">`;return r.id==='juicy-smoked-turkey-breast'?'<img src="/assets/turkey.png" alt="Smoked turkey breast from the original recipe">':'<span aria-hidden="true">✳</span>'}
 function pdfLink(r){return r.original_pdf?'/'+r.original_pdf.split('/').map(encodeURIComponent).join('/'):null}
 async function load(){
@@ -103,6 +104,44 @@ function renderFilterState(count){
  $('#filter-summary').textContent=count+' '+(count===1?'recipe':'recipes')+(trash?' in Trash':'')+(favorites?' · Favorites':'')+(tag?' · '+tag:'')+(query?' · Search: “'+query+'”':'');
 }
 const menuDayNames=['Saturday','Sunday','Monday','Tuesday','Wednesday','Thursday','Friday'];
+function renderGroceries(){
+ const remaining=groceryItems.filter(item=>!item.checked).length;
+ $('#grocery-count').textContent=`${remaining} to buy · ${groceryItems.length} total`;
+ $('#grocery-items').innerHTML=groceryItems.length?groceryItems.map(item=>`<div class="grocery-row" data-id="${item.id}"><label><input type="checkbox" ${item.checked?'checked':''}><span>${esc(item.text)}</span></label><button type="button" class="grocery-remove" aria-label="Remove ${esc(item.text)}">Remove</button></div>`).join(''):'<p class="empty">Your list is empty. Add the first thing you need.</p>';
+ $('#grocery-clear-checked').disabled=!groceryItems.some(item=>item.checked)||groceryBusy;
+ $('#grocery-reset').disabled=!groceryItems.length||groceryBusy;
+ $('#grocery-items').querySelectorAll('.grocery-row').forEach(row=>{
+  const id=row.dataset.id;
+  row.querySelector('input').onchange=event=>changeGroceries({action:'check',id,checked:event.target.checked});
+  row.querySelector('button').onclick=()=>changeGroceries({action:'remove',id});
+ });
+}
+async function refreshGroceries(){
+ if(groceryBusy)return;
+ groceryBusy=true;
+ try{groceryItems=await api('/api/groceries');renderGroceries();$('#grocery-status').textContent=''}
+ catch(error){$('#grocery-status').textContent=error.message||'Could not load the shared list.';recoverAccess(error)}
+ finally{groceryBusy=false;renderGroceries()}
+}
+async function changeGroceries(action){
+ if(groceryBusy)return;
+ groceryBusy=true;$('#grocery-status').textContent='Saving…';
+ try{groceryItems=await api('/api/groceries',action);renderGroceries();$('#grocery-status').textContent='Saved for both of you.';return true}
+ catch(error){$('#grocery-status').textContent=error.message||'Could not save the list.';recoverAccess(error);try{groceryItems=await api('/api/groceries')}catch{}return false}
+ finally{groceryBusy=false;renderGroceries()}
+}
+async function openGroceries(){
+ if($('#groceries').hidden&&!show('groceries'))return;
+ document.querySelectorAll('[data-nav]').forEach(b=>{if(b.dataset.nav==='groceries')b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
+ await refreshGroceries();
+}
+$('#grocery-form').onsubmit=async event=>{event.preventDefault();const input=$('#grocery-input');const value=input.value.trim();if(!value)return;const saved=await changeGroceries({action:'add',text:value});if(saved){input.value='';input.focus()}};
+$('#grocery-refresh').onclick=refreshGroceries;
+$('#grocery-clear-checked').onclick=()=>{if(groceryItems.some(item=>item.checked)&&confirm('Clear checked items from the shared list?'))changeGroceries({action:'clear_checked'})};
+$('#grocery-reset').onclick=()=>{if(groceryItems.length&&confirm('Start a new grocery list? This clears every item for both of you.'))changeGroceries({action:'reset'})};
+$('#grocery-link').onclick=()=>openGroceries();
+window.setInterval(()=>{if(!$('#groceries').hidden&&document.visibilityState==='visible'&&navigator.onLine)refreshGroceries()},15000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!$('#groceries').hidden)refreshGroceries()});
 function saturdayOf(date){const day=new Date(date.getFullYear(),date.getMonth(),date.getDate());day.setDate(day.getDate()-(day.getDay()+1)%7);return day}
 function menuKey(date){return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`}
 function menuHasContent(menu){return [...menu.days,menu.snacks,menu.lunches,menu.sweet_treats].some(value=>value.trim())}
@@ -157,6 +196,7 @@ $('#clear-filters').onclick=()=>{favorites=false;$('#tag').value='';$('#search')
 document.querySelectorAll('[data-nav]').forEach(b=>b.onclick=()=>{
  const action=b.dataset.nav;
  if(action==='menu'){openMenu();return}
+ if(action==='groceries'){openGroceries();return}
  if(action==='add'){editor();return}
  if(!show('library'))return;trash=false;favorites=action==='favorites';$('#favorites').setAttribute('aria-pressed',favorites);$('#tag').value='';$('#search').value='';render();
  if(action==='search'){$('#search').focus();$('#search').scrollIntoView({block:'center'})}

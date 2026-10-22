@@ -53,6 +53,29 @@ class RecipeTests(unittest.TestCase):
                 restored.deserialize(archive.read('recipes.sqlite3'))
                 self.assertEqual(restored.execute('SELECT count(*) FROM weekly_menus').fetchone()[0], 1)
 
+    def test_shared_groceries_add_check_clear_reset_and_backup(self):
+        self.assertEqual(json.load(urlopen(self.url+'/api/groceries')), [])
+        milk = self.post('/api/groceries', {'action':'add','text':'  Milk  '})[0]
+        eggs = self.post('/api/groceries', {'action':'add','text':'Eggs'})[1]
+        self.assertEqual([item['text'] for item in json.load(urlopen(self.url+'/api/groceries'))], ['Milk','Eggs'])
+        checked = self.post('/api/groceries', {'action':'check','id':milk['id'],'checked':True})
+        self.assertEqual([item['text'] for item in checked], ['Eggs','Milk'])
+        self.assertTrue(checked[1]['checked'])
+        with zipfile.ZipFile(io.BytesIO(urlopen(self.url+'/api/backup').read())) as archive:
+            self.assertEqual(len(json.loads(archive.read('groceries.json'))), 2)
+            with sqlite3.connect(':memory:') as restored:
+                restored.deserialize(archive.read('recipes.sqlite3'))
+                self.assertEqual(restored.execute('SELECT COUNT(*) FROM grocery_items').fetchone()[0], 2)
+        self.assertEqual(self.post('/api/groceries', {'action':'clear_checked'})[0]['id'], eggs['id'])
+        self.assertEqual(self.post('/api/groceries', {'action':'reset'}), [])
+        self.assertEqual(json.load(urlopen(self.url+'/api/groceries')), [])
+
+    def test_groceries_reject_invalid_item_without_writing(self):
+        for payload in ({'action':'add','text':' '}, {'action':'add','text':'x'*201}, {'action':'check','id':'bad','checked':True}):
+            with self.assertRaises(HTTPError) as error: self.post('/api/groceries', payload)
+            self.assertEqual(error.exception.code, 400)
+        self.assertEqual(json.load(urlopen(self.url+'/api/groceries')), [])
+
     def test_weekly_menu_rejects_invalid_week_and_shape(self):
         with self.assertRaises(HTTPError) as error:
             self.post('/api/weekly-menu', {'week_start': '2026-10-19', 'days': ['']*7})
@@ -135,8 +158,8 @@ class RecipeTests(unittest.TestCase):
         self.assertIn('Instagram Reel',page)
         self.assertEqual(urlopen(self.url+'/refresh').read().decode(),urlopen(self.url+'/').read().decode())
         self.assertEqual(urlopen(self.url+'/menu').read().decode(),urlopen(self.url+'/').read().decode())
-        self.assertIn('/app-v25.js',page)
-        for alias,original in (('/app-v25.js','/app.js'),('/offline-v25.js','/offline.js'),('/style-v25.css','/style.css')):
+        self.assertIn('/app-v26.js',page)
+        for alias,original in (('/app-v26.js','/app.js'),('/offline-v26.js','/offline.js'),('/style-v26.css','/style.css')):
             self.assertEqual(urlopen(self.url+alias).read(),urlopen(self.url+original).read())
 
     def test_home_screen_metadata_and_icons_are_served(self):
@@ -163,7 +186,7 @@ class RecipeTests(unittest.TestCase):
 
     def test_shell_updates_from_network_without_caching_recipe_api(self):
         worker=urlopen(self.url+'/sw.js').read().decode()
-        self.assertIn("recipe-shell-v25",worker)
+        self.assertIn("recipe-shell-v26",worker)
         self.assertIn("'/menu'",worker)
         self.assertNotIn("'/refresh'",worker)
         self.assertIn('await fetch(event.request',worker)

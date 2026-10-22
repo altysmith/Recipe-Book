@@ -31,6 +31,7 @@ def connect():
     db = sqlite3.connect(DATA / 'recipes.sqlite3')
     db.execute('CREATE TABLE IF NOT EXISTS recipes (id TEXT PRIMARY KEY, title TEXT NOT NULL, document_json TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)')
     db.execute('CREATE TABLE IF NOT EXISTS weekly_menus (week_start TEXT PRIMARY KEY, document_json TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)')
+    db.execute('CREATE TABLE IF NOT EXISTS grocery_items (id TEXT PRIMARY KEY, text TEXT NOT NULL, checked INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)')
     try:
         with db:
             yield db
@@ -118,6 +119,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = unquote(urlparse(self.path).path)
+        if path == '/api/groceries':
+            with connect() as db:
+                rows = db.execute('SELECT id,text,checked FROM grocery_items ORDER BY checked,created_at,rowid').fetchall()
+            return self.respond([{'id': row[0], 'text': row[1], 'checked': bool(row[2])} for row in rows])
         menu_match = re.fullmatch(r'/api/weekly-menu/(\d{4}-\d{2}-\d{2})', path)
         if menu_match:
             try:
@@ -154,6 +159,7 @@ class Handler(BaseHTTPRequestHandler):
                             raise RuntimeError('Backup integrity check failed')
                         records = [json.loads(row[0]) for row in backup.execute('SELECT document_json FROM recipes')]
                         menus = [json.loads(row[0]) for row in backup.execute('SELECT document_json FROM weekly_menus ORDER BY week_start')]
+                        groceries = [{'id': row[0], 'text': row[1], 'checked': bool(row[2])} for row in backup.execute('SELECT id,text,checked FROM grocery_items ORDER BY created_at,rowid')]
                     finally:
                         backup.close()
                 output = io.BytesIO()
@@ -161,9 +167,10 @@ class Handler(BaseHTTPRequestHandler):
                     archive.write(target, 'recipes.sqlite3')
                     archive.writestr('recipes.json', json.dumps(records, ensure_ascii=False, indent=2))
                     archive.writestr('weekly-menus.json', json.dumps(menus, ensure_ascii=False, indent=2))
+                    archive.writestr('groceries.json', json.dumps(groceries, ensure_ascii=False, indent=2))
                     for file in (DATA / 'originals').glob('*'):
                         if file.is_file(): archive.write(file, 'originals/' + file.name)
-                    archive.writestr('RESTORE.txt', 'Close Recipe Book. Keep a copy of your current user_data folder. Extract recipes.sqlite3 and originals into user_data, then restart. recipes.json and weekly-menus.json are portable text exports. Photos are included in recipe records. Trash and weekly menus are retained. Browser ingredient checkmarks are device-specific and are not in this backup.')
+                    archive.writestr('RESTORE.txt', 'Close Recipe Book. Keep a copy of your current user_data folder. Extract recipes.sqlite3 and originals into user_data, then restart. recipes.json, weekly-menus.json, and groceries.json are portable text exports. Photos are included in recipe records. Trash, weekly menus, and the shared grocery list are retained. Browser recipe ingredient checkmarks are device-specific and are not in this backup.')
                 content = output.getvalue()
             self.send_response(200)
             self.send_header('Content-Type', 'application/zip')
@@ -179,6 +186,7 @@ class Handler(BaseHTTPRequestHandler):
             base = (ROOT / 'web').resolve()
             # Versioned shell paths bypass older cache-first service workers.
             aliases = {'/instagram': 'index.html', '/refresh': 'index.html', '/menu': 'index.html',
+                       '/app-v26.js': 'app.js', '/offline-v26.js': 'offline.js', '/style-v26.css': 'style.css',
                        '/app-v25.js': 'app.js', '/offline-v25.js': 'offline.js', '/style-v25.css': 'style.css',
                        '/app-v24.js': 'app.js', '/offline-v24.js': 'offline.js', '/style-v24.css': 'style.css',
                        '/app-v23.js': 'app.js', '/offline-v23.js': 'offline.js', '/style-v23.css': 'style.css',
@@ -210,6 +218,33 @@ class Handler(BaseHTTPRequestHandler):
             if not 0 < size <= 15_000_000:
                 raise ValueError('Upload must be smaller than 10 MB.')
             body = json.loads(self.rfile.read(size))
+            if self.path == '/api/groceries':
+                if not isinstance(body, dict): raise ValueError('Invalid grocery item.')
+                action = body.get('action')
+                with connect() as db:
+                    if action == 'add':
+                        item = body.get('text')
+                        if not isinstance(item, str) or not item.strip() or len(item.strip()) > 200:
+                            raise ValueError('Enter an item of 1–200 characters.')
+                        db.execute('INSERT INTO grocery_items(id,text) VALUES(?,?)', (uuid.uuid4().hex, item.strip()))
+                    elif action in ('check', 'remove'):
+                        item_id = body.get('id')
+                        if not isinstance(item_id, str) or not re.fullmatch(r'[0-9a-f]{32}', item_id):
+                            raise ValueError('Invalid grocery item.')
+                        if action == 'check':
+                            if not isinstance(body.get('checked'), bool): raise ValueError('Invalid checked state.')
+                            cursor = db.execute('UPDATE grocery_items SET checked=? WHERE id=?', (int(body['checked']), item_id))
+                        else:
+                            cursor = db.execute('DELETE FROM grocery_items WHERE id=?', (item_id,))
+                        if not cursor.rowcount: return self.respond({'error': 'This item is no longer on the list. Refresh to see the latest list.'}, 404)
+                    elif action == 'clear_checked':
+                        db.execute('DELETE FROM grocery_items WHERE checked=1')
+                    elif action == 'reset':
+                        db.execute('DELETE FROM grocery_items')
+                    else:
+                        raise ValueError('Invalid grocery action.')
+                    rows = db.execute('SELECT id,text,checked FROM grocery_items ORDER BY checked,created_at,rowid').fetchall()
+                return self.respond([{'id': row[0], 'text': row[1], 'checked': bool(row[2])} for row in rows])
             if self.path == '/api/import-video':
                 from video_jobs import create
                 return self.respond(create(body.get('url')), 202)
