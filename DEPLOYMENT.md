@@ -1,5 +1,11 @@
 # Recipe Book deployment
 
+## 2026-10-21 multiline groceries follow-up
+
+Commit `26a9474` changes grocery entry to a multiline draft with a Save button below it. Each nonempty line becomes one shared checklist item in one transaction; existing items remain. An unsaved draft prompts before navigation and is protected from an automatic service-worker reload. The shell is `recipe-shell-v27`.
+
+Pre-release data backup: `/home/ealtenho/recipe-book-backups/recipes-20261022T003141Z.zip`. Prior code archive: `/home/ealtenho/recipe-release-bulk-groceries-20261021/before-code.tar.gz`. Hash-matched copies are in `C:\Users\erica\Desktop\Codex\Recipe Book Backups`. Local and Pi staging suites passed 57 tests; the local shared-list and weekly-menu browser checks passed at 390px and 1440px. A read-only Pi-origin browser check at 320px, 390px, and 1440px confirmed the textarea, Save button, and no checklist write before Save, with no horizontal overflow or page errors. The service and tunnel are active, v27 assets respond, and the public hostname redirects anonymous requests to Cloudflare Access. The post-release backup `/home/ealtenho/recipe-book-backups/recipes-20261022T003328Z.zip` matched all 13 recipes, one weekly menu, zero grocery items, and one original PDF from the pre-release backup; SQLite integrity remained `ok`. Authenticated phone interaction remains unverified.
+
 ## 2026-10-21 shared groceries release
 
 Commit `dc78cf8` adds a shared grocery list to Lolo’s Kitchen. Eric and Audrey can add items, check them off, remove one item, clear checked items, or reset the whole list. The items live in `user_data/recipes.sqlite3` and are included in `/api/backup` as a table and `groceries.json`. The shell is `recipe-shell-v26`.
