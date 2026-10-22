@@ -24,23 +24,27 @@ const {chromium} = require('playwright');
   for(const page of [first,second]){page.on('pageerror',error=>errors.push(error.message));await page.goto(`http://127.0.0.1:${port}/`)}
   await first.locator('[data-nav="groceries"]').click();
   await second.locator('#grocery-link').click();
-  await first.locator('#grocery-input').fill('Milk');
-  await first.getByRole('button',{name:'Add item'}).click();
+  await first.locator('#grocery-input').fill('Milk\n\nEggs\nPasta');
+  assert.equal(await first.locator('.grocery-row').count(),0);
+  await first.getByRole('button',{name:'Save to grocery list'}).click();
   await first.getByText('Saved for both of you.').waitFor();
+  assert.equal(await first.locator('.grocery-row').count(),3);
   await second.getByRole('button',{name:'Refresh list'}).click();
   await second.locator('.grocery-row').first().getByText('Milk').waitFor();
+  assert.equal(await second.locator('.grocery-row').count(),3);
   await Promise.all([
    second.waitForResponse(response=>response.url().endsWith('/api/groceries')&&response.request().method()==='POST'),
-   second.locator('.grocery-row input').check(),
+   second.locator('.grocery-row input').first().check(),
   ]);
   await first.getByRole('button',{name:'Refresh list'}).click();
-  await first.waitForFunction(()=>document.querySelector('.grocery-row input')?.checked===true);
-  assert.equal(await first.locator('.grocery-row input').isChecked(),true);
+  await first.waitForFunction(()=>[...document.querySelectorAll('.grocery-row')].some(row=>row.textContent.includes('Milk')&&row.querySelector('input').checked));
+  assert.equal(await first.getByRole('checkbox',{name:'Milk'}).isChecked(),true);
   first.once('dialog',dialog=>dialog.accept());
   await first.getByRole('button',{name:'Clear checked items'}).click();
-  await first.getByText('Your list is empty.').waitFor();
-  await first.locator('#grocery-input').fill('Eggs');
-  await first.getByRole('button',{name:'Add item'}).click();
+  await first.waitForFunction(()=>document.querySelectorAll('.grocery-row').length===2);
+  await first.locator('#grocery-input').fill('Bread\nButter');
+  await first.getByRole('button',{name:'Save to grocery list'}).click();
+  await first.waitForFunction(()=>document.querySelectorAll('.grocery-row').length===4);
   first.once('dialog',dialog=>dialog.accept());
   await first.getByRole('button',{name:'Start a new list'}).click();
   await first.getByText('Your list is empty.').waitFor();

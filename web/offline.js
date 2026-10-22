@@ -17,7 +17,8 @@ window.offlineShellReady = (async()=>{
  navigator.serviceWorker.addEventListener('controllerchange',()=>{
   const menuOpen=document.querySelector('#menu')?.hidden===false;
   const editingMenu=menuOpen&&document.querySelector('#menu-form')?.hidden===false;
-  if(document.querySelector('#editor')?.hidden!==false&&!editingMenu){
+  const groceryDraftOpen=document.querySelector('#groceries')?.hidden===false&&!!document.querySelector('#grocery-input')?.value.trim();
+  if(document.querySelector('#editor')?.hidden!==false&&!editingMenu&&!groceryDraftOpen){
    if(menuOpen&&location.pathname!=='/menu')location.replace('/menu');
    else location.reload();
    return;

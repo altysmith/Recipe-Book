@@ -186,6 +186,7 @@ class Handler(BaseHTTPRequestHandler):
             base = (ROOT / 'web').resolve()
             # Versioned shell paths bypass older cache-first service workers.
             aliases = {'/instagram': 'index.html', '/refresh': 'index.html', '/menu': 'index.html',
+                       '/app-v27.js': 'app.js', '/offline-v27.js': 'offline.js', '/style-v27.css': 'style.css',
                        '/app-v26.js': 'app.js', '/offline-v26.js': 'offline.js', '/style-v26.css': 'style.css',
                        '/app-v25.js': 'app.js', '/offline-v25.js': 'offline.js', '/style-v25.css': 'style.css',
                        '/app-v24.js': 'app.js', '/offline-v24.js': 'offline.js', '/style-v24.css': 'style.css',
@@ -223,10 +224,14 @@ class Handler(BaseHTTPRequestHandler):
                 action = body.get('action')
                 with connect() as db:
                     if action == 'add':
-                        item = body.get('text')
-                        if not isinstance(item, str) or not item.strip() or len(item.strip()) > 200:
-                            raise ValueError('Enter an item of 1–200 characters.')
-                        db.execute('INSERT INTO grocery_items(id,text) VALUES(?,?)', (uuid.uuid4().hex, item.strip()))
+                        text = body.get('text')
+                        if not isinstance(text, str) or len(text) > 20_000:
+                            raise ValueError('Keep the grocery draft under 20,000 characters.')
+                        items = [line.strip() for line in text.splitlines() if line.strip()]
+                        if not items or len(items) > 100 or any(len(item) > 200 for item in items):
+                            raise ValueError('Enter 1–100 grocery items, one per line, up to 200 characters each.')
+                        db.executemany('INSERT INTO grocery_items(id,text) VALUES(?,?)',
+                                       [(uuid.uuid4().hex, item) for item in items])
                     elif action in ('check', 'remove'):
                         item_id = body.get('id')
                         if not isinstance(item_id, str) or not re.fullmatch(r'[0-9a-f]{32}', item_id):

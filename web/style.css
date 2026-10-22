@@ -62,8 +62,8 @@ h1,h2,.card-body h3{font-family:Arial,Helvetica,sans-serif;letter-spacing:-.6px}
 #groceries>p:not(.eyebrow){color:#59665b}
 .grocery-add{background:#fffaf1;border:1px solid #ded8ca;border-radius:18px;padding:18px;margin:24px 0}
 .grocery-add label{display:block;font-weight:700;margin:0 0 8px}
-.grocery-add>div{display:flex;gap:10px}
-.grocery-add input{flex:1;min-width:0}
+.grocery-add textarea{display:block;width:100%;min-height:170px;margin:8px 0 14px;resize:vertical}
+.grocery-add #grocery-save{display:block;margin-left:auto}
 .grocery-toolbar,.grocery-actions{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:16px 0}
 #grocery-count{font-weight:700}
 .grocery-items{display:grid;gap:8px}
@@ -74,5 +74,5 @@ h1,h2,.card-body h3{font-family:Arial,Helvetica,sans-serif;letter-spacing:-.6px}
 .grocery-row:has(input:checked) span{text-decoration:line-through;color:#777e73}
 .grocery-remove{border:0;background:transparent;color:#8a4a36;padding:8px 10px}
 #grocery-status{min-height:24px;color:#59665b}
-@media(max-width:700px){.header-actions #grocery-link{display:none}#groceries{padding-top:20px}.grocery-add>div{flex-wrap:wrap}.grocery-add input{flex-basis:100%}.grocery-add button{width:100%}.grocery-actions button{flex:1}}
+@media(max-width:700px){.header-actions #grocery-link{display:none}#groceries{padding-top:20px}.grocery-add #grocery-save{width:100%}.grocery-actions button{flex:1}}
 @media print{#groceries .grocery-add,#groceries .grocery-toolbar button,#groceries .grocery-actions,#grocery-status,.grocery-remove{display:none!important}}
