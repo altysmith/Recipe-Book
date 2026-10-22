@@ -1,5 +1,11 @@
 # Recipe Book deployment
 
+## 2026-10-21 shared groceries release
+
+Commit `dc78cf8` adds a shared grocery list to Lolo’s Kitchen. Eric and Audrey can add items, check them off, remove one item, clear checked items, or reset the whole list. The items live in `user_data/recipes.sqlite3` and are included in `/api/backup` as a table and `groceries.json`. The shell is `recipe-shell-v26`.
+
+Pre-release data backup: `/home/ealtenho/recipe-book-backups/recipes-20261022T002227Z.zip`. Prior code archive: `/home/ealtenho/recipe-release-groceries-20261021/before-code.tar.gz`. Hash-matched copies are in `C:\Users\erica\Desktop\Codex\Recipe Book Backups`. The seven changed source files were staged and the Pi suite passed 56 tests using the existing isolated ReportLab test dependency. Local 56-test and two-browser grocery checks passed. The production service and tunnel are active, and the Pi origin serves v26 assets and an empty `/api/groceries` list. A read-only browser check through the Pi origin passed at 390px and 1440px, with no horizontal overflow or page errors. A post-release backup at `/home/ealtenho/recipe-book-backups/recipes-20261022T002400Z.zip` showed unchanged 13 recipes, one weekly menu, and one original PDF, SQLite integrity `ok`, and no grocery items. The public hostname redirects anonymous requests to Cloudflare Access. Authenticated phone interaction remains unverified.
+
 ## 2026-10-21 paired mobile header buttons
 
 Commit `471829b` places **Weekly menu** and **+ Add a recipe** side by side in the phone header. At 370px and below, the two buttons share a second header row. The shell is `recipe-shell-v25`. The pre-release data backup is `/home/ealtenho/recipe-book-backups/recipes-20261021T220000Z.zip`; the prior code is `/home/ealtenho/recipe-release-mobile-header-20261021/before-code.tar.gz`. Hash-matched copies of both are in `C:\Users\erica\Desktop\Codex\Recipe Book Backups`.
