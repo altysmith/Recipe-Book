@@ -1,5 +1,11 @@
 # Recipe Book deployment
 
+## 2026-10-22 grocery and phone navigation colors
+
+Commit `d521784` makes the desktop Groceries button cream with dark text and the phone navigation forest green with light labels. It builds on the Safari shell update and advances the shell and site-version signal to `recipe-shell-v29`. GitHub `main` and the Raspberry Pi serve the release.
+
+The pre-release data backup is `/home/ealtenho/recipe-book-backups/recipes-20261022T123255Z.zip`; the post-release backup is `/home/ealtenho/recipe-book-backups/recipes-20261022T123558Z.zip`. The code rollback archive is `/home/ealtenho/recipe-release-ui-colors-20261022/before-code.tar.gz`. Hash-matched off-device copies are in `C:\Users\erica\Desktop\Codex\Recipe Book Backups`. All 57 local and Pi staging tests passed, as did the shell update and shared grocery browser checks. A read-only Pi-origin browser check at 390px and 1440px confirmed the button and bar colors, grocery navigation, no overflow, and no page errors. The live service and tunnel are active, `/api/site-version` reports v29, and the public hostname redirects anonymous visitors to Cloudflare Access. Both backups passed SQLite `quick_check`; all 14 recipes, one saved menu, one grocery item, and the original PDF matched before and after. Authenticated phone interaction remains unverified.
+
 ## 2026-10-21 Safari update recovery
 
 Commit `42ab3d8` adds a no-store `/api/site-version` check when the app opens, returns to the foreground, and remains open. An available update loads through the uncached `/refresh` route, then restores the normal cached address for offline use. Open recipe, weekly-menu, and grocery drafts show a **Load website update** button instead of being replaced. Shell and asset version: `recipe-shell-v28`. If a phone is still running a pre-v28 saved screen, open `https://recipes.altylab.com/refresh` once in Safari to enter the new update path.
