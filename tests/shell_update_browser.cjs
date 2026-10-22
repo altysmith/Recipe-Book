@@ -8,7 +8,7 @@ const { chromium } = require('playwright');
 const web = path.join(__dirname, '..', 'web');
 let revision = 1;
 let workerRevision = 1;
-let reportedShell = 'recipe-shell-v28';
+let reportedShell = 'recipe-shell-v29';
 let refreshRequests = 0;
 const server = http.createServer((request, response) => {
   const name = new URL(request.url, 'http://localhost').pathname;
@@ -18,21 +18,21 @@ const server = http.createServer((request, response) => {
     return response.end(JSON.stringify({shell: reportedShell}));
   }
   if (['/', '/instagram', '/menu', '/refresh'].includes(name)) {
-    if (name === '/refresh') { refreshRequests++; reportedShell = 'recipe-shell-v28'; }
+    if (name === '/refresh') { refreshRequests++; reportedShell = 'recipe-shell-v29'; }
     response.setHeader('Content-Type', 'text/html');
-    return response.end(`<!doctype html><html><body data-revision="${revision}"><main><div class="offline-bar">Recipes</div><section id="editor" hidden></section></main><script src="/offline-v28.js" defer></script><script>addEventListener('load',()=>{if(location.pathname==='/refresh')history.replaceState(null,'','/')})</script></body></html>`);
+    return response.end(`<!doctype html><html><body data-revision="${revision}"><main><div class="offline-bar">Recipes</div><section id="editor" hidden></section></main><script src="/offline-v29.js" defer></script><script>addEventListener('load',()=>{if(location.pathname==='/refresh')history.replaceState(null,'','/')})</script></body></html>`);
   }
   if (name === '/sw.js') {
     response.setHeader('Content-Type', 'text/javascript');
     return response.end(fs.readFileSync(path.join(web, 'sw.js')) + `\n// test revision ${workerRevision}\n`);
   }
-  if (name === '/offline-v28.js') {
+  if (name === '/offline-v29.js') {
     response.setHeader('Content-Type', 'text/javascript');
     return response.end(fs.readFileSync(path.join(web, 'offline.js')));
   }
   if (name === '/categories.json') return response.end('[]');
   if (name === '/assets/turkey.png') return response.end('image');
-  if (['/app-v28.js', '/style-v28.css'].includes(name)) return response.end('');
+  if (['/app-v29.js', '/style-v29.css'].includes(name)) return response.end('');
   if (['/manifest.webmanifest', '/apple-touch-icon.png', '/icon-192.png', '/icon-512.png'].includes(name)) return response.end(fs.readFileSync(path.join(web, name.slice(1))));
   response.statusCode = 404; response.end('Not found');
 });
@@ -49,7 +49,7 @@ const server = http.createServer((request, response) => {
     await page.waitForFunction(() => !!navigator.serviceWorker.controller);
     assert.equal(await page.locator('body').getAttribute('data-revision'), '1');
     assert.equal(await page.evaluate(async()=>{
-      const cache=await caches.open('recipe-shell-v28');
+      const cache=await caches.open('recipe-shell-v29');
       return !!(await cache.match('/refresh'));
     }),false,
       'sign-in recovery must bypass the service worker cache');
@@ -71,12 +71,12 @@ const server = http.createServer((request, response) => {
     assert.equal(await page.getByRole('button', {name:'Load website update'}).isVisible(), true);
     const priorRefreshes = refreshRequests;
     revision = 3;
-    reportedShell = 'recipe-shell-v29';
+    reportedShell = 'recipe-shell-v30';
     await page.getByRole('button', {name:'Load website update'}).click();
     await page.waitForFunction(() => document.body.dataset.revision === '3');
     assert.equal(refreshRequests, priorRefreshes + 1, 'updates must use the uncached refresh route');
     assert.equal(await page.locator('body').getAttribute('data-revision'), '3');
-    reportedShell = 'recipe-shell-v29';
+    reportedShell = 'recipe-shell-v30';
     revision = 4;
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
     await page.waitForFunction(() => document.body.dataset.revision === '4');

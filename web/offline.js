@@ -9,7 +9,7 @@ window.recipeStorage = (() => {
  async function set(key,value){const db=await opened;return new Promise((resolve,reject)=>{const tx=db.transaction('data','readwrite');tx.objectStore('data').put(value,key);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error)})}
  return {get,set};
 })();
-const SHELL_VERSION='recipe-shell-v28';
+const SHELL_VERSION='recipe-shell-v29';
 let shellUpdatePending=false;
 function shellUpdateUrl(){
  const view=document.querySelector('#menu')?.hidden===false?'menu':document.querySelector('#groceries')?.hidden===false?'groceries':'';

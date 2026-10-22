@@ -18,7 +18,7 @@ from urllib.parse import urlparse, unquote
 
 ROOT = Path(__file__).resolve().parent
 CATEGORIES = json.loads((ROOT / 'web/categories.json').read_text())
-SHELL_VERSION = 'recipe-shell-v28'
+SHELL_VERSION = 'recipe-shell-v29'
 
 def category_tags(tags):
     lookup = {name.casefold(): name for name in CATEGORIES}
@@ -189,6 +189,7 @@ class Handler(BaseHTTPRequestHandler):
             base = (ROOT / 'web').resolve()
             # Versioned shell paths bypass older cache-first service workers.
             aliases = {'/instagram': 'index.html', '/refresh': 'index.html', '/menu': 'index.html',
+                       '/app-v29.js': 'app.js', '/offline-v29.js': 'offline.js', '/style-v29.css': 'style.css',
                        '/app-v28.js': 'app.js', '/offline-v28.js': 'offline.js', '/style-v28.css': 'style.css',
                        '/app-v27.js': 'app.js', '/offline-v27.js': 'offline.js', '/style-v27.css': 'style.css',
                        '/app-v26.js': 'app.js', '/offline-v26.js': 'offline.js', '/style-v26.css': 'style.css',
