@@ -1,5 +1,11 @@
 # Recipe Book deployment
 
+## 2026-10-21 Safari update recovery
+
+Commit `42ab3d8` adds a no-store `/api/site-version` check when the app opens, returns to the foreground, and remains open. An available update loads through the uncached `/refresh` route, then restores the normal cached address for offline use. Open recipe, weekly-menu, and grocery drafts show a **Load website update** button instead of being replaced. Shell and asset version: `recipe-shell-v28`. If a phone is still running a pre-v28 saved screen, open `https://recipes.altylab.com/refresh` once in Safari to enter the new update path.
+
+The pre-release data backup is `/home/ealtenho/recipe-book-backups/recipes-20261022T010652Z.zip`, with a hash-matched off-Pi copy in `C:\Users\erica\Desktop\Codex\Recipe Book Backups`. The prior code is `/home/ealtenho/recipe-release-safari-20261021/before-code.tar.gz`; the off-Pi copy is `recipe-safari-20261021-before-code.tar.gz`. The local and Pi staging suites each passed 57 tests, and the browser shell test passed online refresh, offline fallback, draft protection, and version-check recovery. The five deployed files matched the tested source hashes. A 390px Pi-origin browser session opened 14 recipes and the weekly menu with no page errors or horizontal overflow. The service and tunnel are active, the public hostname still redirects anonymous requests to Cloudflare Access, and the Pi serves v28. The post-release backup `/home/ealtenho/recipe-book-backups/recipes-20261022T010936Z.zip` matched the pre-release recipe, menu, grocery, and original-file exports byte for byte; SQLite integrity is `ok`. Audrey's authenticated iPhone Safari behavior still requires a check on her device.
+
 ## 2026-10-21 multiline groceries follow-up
 
 Commit `26a9474` changes grocery entry to a multiline draft with a Save button below it. Each nonempty line becomes one shared checklist item in one transaction; existing items remain. An unsaved draft prompts before navigation and is protected from an automatic service-worker reload. The shell is `recipe-shell-v27`.
