@@ -78,3 +78,5 @@ h1,h2,.card-body h3{font-family:Arial,Helvetica,sans-serif;letter-spacing:-.6px}
 @media print{#groceries .grocery-add,#groceries .grocery-toolbar button,#groceries .grocery-actions,#grocery-status,.grocery-remove{display:none!important}}
 
 .share-status:empty{display:none}.share-status:not(:empty){margin:-8px 0 18px;padding:10px 14px;background:#e7ebdc;border-radius:8px;font-size:14px}
+
+.recipe-save-status{margin:22px 0 10px;padding:11px 14px;background:#e7ebdc;border-radius:8px;color:#36554b;font-size:14px}
