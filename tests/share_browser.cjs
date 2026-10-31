@@ -5,6 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const {chromium} = require('playwright');
 
+const photoBase64 = '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAoHBwgHBgoICAgLCgoLDhgQDg0NDh0VFhEYIx8lJCIfIiEmKzcvJik0KSEiMEExNDk7Pj4+JS5ESUM8SDc9Pjv/2wBDAQoLCw4NDhwQEBw7KCIoOzs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozv/wAARCAACAAIDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwCtRRRXzh9ef//Z';
 const recipe = {
  id:'test-recipe',title:'Sunday Soup',author:'Lolo',servings:'4',
  total_minutes:35,tags:['Soups & Stews'],favorite:false,deleted:false,
@@ -29,14 +30,16 @@ const expected = 'Sunday Soup\nServes 4 · Total time: 35 minutes\n\nIngredients
   }
   browser=await chromium.launch({headless:true,channel:'msedge'});
   for(const [width,native] of [[390,true],[1440,false]]){
+   const sample={...recipe,photo:native?'data:image/jpeg;base64,'+photoBase64:''};
    const page=await browser.newPage({viewport:{width,height:844},isMobile:width===390});
    const errors=[];page.on('pageerror',error=>errors.push(error.message));
    await page.addInitScript(hasShare=>{
     window.shared=null;window.copied=null;
     Object.defineProperty(navigator,'share',{configurable:true,value:hasShare?async data=>{window.shared=data}:undefined});
+    Object.defineProperty(navigator,'canShare',{configurable:true,value:hasShare?data=>!!data.files:undefined});
     Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.copied=text}}});
    },native);
-   await page.route('**/api/recipes',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify([recipe])}));
+   await page.route('**/api/recipes',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify([sample])}));
    await page.goto(`http://127.0.0.1:${port}/`);
    await page.getByRole('button',{name:'Open Sunday Soup'}).first().click();
    const share=page.getByRole('button',{name:'Share recipe'});
@@ -46,7 +49,23 @@ const expected = 'Sunday Soup\nServes 4 · Total time: 35 minutes\n\nIngredients
     await page.waitForFunction(()=>window.shared!==null);
     assert.deepEqual(await page.evaluate(()=>window.shared),{title:'Sunday Soup',text:expected});
     assert.equal(await page.evaluate(()=>window.copied),null);
+    const photoShare=page.getByRole('button',{name:'Share photo'});
+    assert.equal(await photoShare.isVisible(),true);
+    await photoShare.click();
+    await page.waitForFunction(()=>window.shared?.files?.length===1);
+    const attachment=await page.evaluate(async()=>{
+     const share=window.shared,file=share.files?.[0];
+     return {keys:Object.keys(share),name:file?.name,type:file?.type,bytes:[...new Uint8Array(await file.arrayBuffer())]};
+    });
+    assert.deepEqual(attachment.keys,['files'],'photo share must not include text because iPhone may drop the image');
+    assert.equal(attachment.name,'recipe-photo.jpg');
+    assert.equal(attachment.type,'image/jpeg');
+    assert.deepEqual(attachment.bytes,[...Buffer.from(photoBase64,'base64')]);
+    await page.evaluate(()=>Object.defineProperty(navigator,'canShare',{configurable:true,value:()=>false}));
+    await photoShare.click();
+    await page.getByText('This browser cannot attach the photo.',{exact:false}).waitFor();
    }else{
+    assert.equal(await page.getByRole('button',{name:'Share photo'}).count(),0);
     await page.getByText('Recipe copied. Paste it into a text message.').waitFor();
     assert.equal(await page.evaluate(()=>window.copied),expected);
    }
