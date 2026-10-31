@@ -76,3 +76,5 @@ h1,h2,.card-body h3{font-family:Arial,Helvetica,sans-serif;letter-spacing:-.6px}
 #grocery-status{min-height:24px;color:#59665b}
 @media(max-width:700px){.header-actions #grocery-link{display:none}#groceries{padding-top:20px}.grocery-add #grocery-save{width:100%}.grocery-actions button{flex:1}}
 @media print{#groceries .grocery-add,#groceries .grocery-toolbar button,#groceries .grocery-actions,#grocery-status,.grocery-remove{display:none!important}}
+
+.share-status:empty{display:none}.share-status:not(:empty){margin:-8px 0 18px;padding:10px 14px;background:#e7ebdc;border-radius:8px;font-size:14px}
