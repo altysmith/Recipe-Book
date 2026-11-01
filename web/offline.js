@@ -9,12 +9,14 @@ window.recipeStorage = (() => {
  async function set(key,value){const db=await opened;return new Promise((resolve,reject)=>{const tx=db.transaction('data','readwrite');tx.objectStore('data').put(value,key);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error)})}
  return {get,set};
 })();
-const SHELL_VERSION='recipe-shell-v33';
+const SHELL_VERSION='recipe-shell-v34';
 let shellUpdatePending=false;
 function shellUpdateUrl(){
- const view=document.querySelector('#menu')?.hidden===false?'menu':document.querySelector('#groceries')?.hidden===false?'groceries':'';
+ const view=location.pathname==='/menu'||document.querySelector('#menu')?.hidden===false?'menu':document.querySelector('#groceries')?.hidden===false?'groceries':'';
  const params=new URLSearchParams({version:SHELL_VERSION});
  if(view)params.set('view',view);
+ const week=new URLSearchParams(location.search).get('week');
+ if(view==='menu'&&/^\d{4}-\d{2}-\d{2}$/.test(week||''))params.set('week',week);
  return '/refresh?'+params;
 }
 function loadShellUpdate(){location.replace(shellUpdateUrl())}

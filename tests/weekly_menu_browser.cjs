@@ -18,8 +18,10 @@ const {chromium} = require('playwright');
    await new Promise(resolve=>setTimeout(resolve,100));
   }
   browser=await chromium.launch({headless:true,channel:'msedge'});
+  const context=await browser.newContext({serviceWorkers:'block'});
+  await context.route('**/offline-v34.js',route=>route.fulfill({status:200,contentType:'text/javascript',body:'window.offlineShellReady=Promise.resolve();'}));
   for(const width of [390,1440]){
-   const page=await browser.newPage({viewport:{width,height:844}});
+   const page=await context.newPage();await page.setViewportSize({width,height:844});
    const errors=[];page.on('pageerror',error=>errors.push(error.message));
    await page.goto(`http://127.0.0.1:${port}/`);
    if(width===390){
@@ -28,7 +30,8 @@ const {chromium} = require('playwright');
     assert.ok(Math.abs(menuButton.y-addButton.y)<2);
    }
    await (width===390?page.locator('[data-nav="menu"]'):page.locator('#menu-link')).click();
-   if(width===1440)await page.locator('#menu-next').click();
+   await page.waitForFunction(()=>document.querySelector('#menu-status').textContent==='');
+   if(width===1440){await page.locator('#menu-next').click();await page.waitForFunction(()=>document.querySelector('#menu-status').textContent==='')}
    await page.locator('#menu-days textarea').first().waitFor();
    assert.equal(await page.locator('#menu-days textarea').count(),7);
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
@@ -48,8 +51,11 @@ const {chromium} = require('playwright');
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
    if(process.env.MENU_SCREENSHOT){fs.mkdirSync(path.join(root,'tmp'),{recursive:true});await page.screenshot({path:path.join(root,'tmp',`weekly-menu-${width}.png`),fullPage:true})}
    await page.reload();
-   await (width===390?page.locator('[data-nav="menu"]'):page.locator('#menu-link')).click();
-   if(width===1440)await page.locator('#menu-next').click();
+   if(new URL(page.url()).pathname!=='/menu'){
+    await (width===390?page.locator('[data-nav="menu"]'):page.locator('#menu-link')).click();
+    await page.waitForFunction(()=>document.querySelector('#menu-status').textContent==='');
+    if(width===1440){await page.locator('#menu-next').click();await page.waitForFunction(()=>document.querySelector('#menu-status').textContent==='')}
+   }
    await page.locator('#menu-display').waitFor({state:'visible'});
    assert.equal(await page.locator('#menu-form').isVisible(),false);
    await page.getByRole('button',{name:'Edit menu'}).click();
@@ -65,14 +71,14 @@ const {chromium} = require('playwright');
    assert.deepEqual(errors,[]);
    await page.close();
   }
-  const mobile=await browser.newPage({viewport:{width:390,height:844}});
+  const mobile=await context.newPage();await mobile.setViewportSize({width:390,height:844});
   await mobile.goto(`http://127.0.0.1:${port}/menu`);
   await mobile.locator('#menu-display').waitFor({state:'visible'});
   assert.equal(await mobile.locator('#menu-link').isVisible(),true);
   assert.equal(await mobile.locator('.menu-display-day').count(),7);
   assert.equal(await mobile.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await mobile.close();
-  const narrow=await browser.newPage({viewport:{width:320,height:700}});
+  const narrow=await context.newPage();await narrow.setViewportSize({width:320,height:700});
   await narrow.goto(`http://127.0.0.1:${port}/menu`);
   await narrow.locator('#menu').waitFor({state:'visible'});
   const narrowMenu=await narrow.locator('#menu-link').boundingBox(),narrowAdd=await narrow.locator('#add').boundingBox();
@@ -80,6 +86,17 @@ const {chromium} = require('playwright');
   assert.ok(Math.abs(narrowMenu.y-narrowAdd.y)<2);
   assert.equal(await narrow.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await narrow.close();
+  const deepLink=await context.newPage();
+  await deepLink.goto(`http://127.0.0.1:${port}/menu?week=2026-10-31`);
+  await deepLink.locator('#menu-display').waitFor({state:'visible'});
+  assert.equal(await deepLink.evaluate(()=>menuKey(menuWeek)),'2026-10-31');
+  await deepLink.locator('#menu-next').click();
+  await deepLink.waitForFunction(()=>document.querySelector('#menu-status').textContent==='');
+  assert.match(deepLink.url(),/\?week=2026-11-07$/);
+  await deepLink.reload();
+  await deepLink.locator('#menu-display').waitFor({state:'visible'});
+  assert.equal(await deepLink.evaluate(()=>menuKey(menuWeek)),'2026-11-07');
+  await deepLink.close();
   console.log('Weekly menu browser check passed at 390px and 1440px.');
  }finally{
   await browser?.close();server.kill();

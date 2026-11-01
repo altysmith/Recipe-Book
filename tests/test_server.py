@@ -168,9 +168,9 @@ class RecipeTests(unittest.TestCase):
         self.assertIn('Instagram Reel',page)
         self.assertEqual(urlopen(self.url+'/refresh').read().decode(),urlopen(self.url+'/').read().decode())
         self.assertEqual(urlopen(self.url+'/menu').read().decode(),urlopen(self.url+'/').read().decode())
-        self.assertIn('/app-v33.js',page)
-        self.assertEqual(json.load(urlopen(self.url+'/api/site-version')), {'shell': 'recipe-shell-v33'})
-        for alias,original in (('/app-v33.js','/app.js'),('/offline-v33.js','/offline.js'),('/style-v33.css','/style.css')):
+        self.assertIn('/app-v34.js',page)
+        self.assertEqual(json.load(urlopen(self.url+'/api/site-version')), {'shell': 'recipe-shell-v34'})
+        for alias,original in (('/app-v34.js','/app.js'),('/offline-v34.js','/offline.js'),('/style-v34.css','/style.css')):
             self.assertEqual(urlopen(self.url+alias).read(),urlopen(self.url+original).read())
 
     def test_home_screen_metadata_and_icons_are_served(self):
@@ -197,7 +197,7 @@ class RecipeTests(unittest.TestCase):
 
     def test_shell_updates_from_network_without_caching_recipe_api(self):
         worker=urlopen(self.url+'/sw.js').read().decode()
-        self.assertIn("recipe-shell-v33",worker)
+        self.assertIn("recipe-shell-v34",worker)
         self.assertIn("'/menu'",worker)
         self.assertNotIn("'/refresh'",worker)
         self.assertIn('await fetch(event.request',worker)

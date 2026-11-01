@@ -26,7 +26,8 @@ async function recoverAccess(error){
   if(Date.now()-last<60000)return false;
   sessionStorage.setItem('recipe-access-recovery',String(Date.now()));
  }catch{return false}
- location.replace('/refresh');return true;
+ const week=location.pathname==='/menu'?menuWeekFromUrl():null;
+ location.replace(week?`/refresh?view=menu&week=${menuKey(week)}`:'/refresh');return true;
 }
 function connectionNotice(show){
  let notice=$('#connection-notice');
@@ -209,7 +210,7 @@ function editor(r={}){if(!r.id&&!r.import){const draft=storedRecipeDraft();if(dr
 async function extract(body){message('Reading your recipe…');$('#extract').disabled=true;$('#extract-chatgpt').disabled=true;$('#pdf').disabled=true;try{const r=await api('/api/import',body);dirty=false;if(body.text)clearImportTextDraft();editor(r);message('Draft ready. Check the title, line breaks, ingredients, and directions. Changes save automatically.')}catch(e){message(e.message)}finally{$('#extract').disabled=false;$('#extract-chatgpt').disabled=false;$('#pdf').disabled=false}}
 $('#add').onclick=()=>editor();$('.brand').onclick=e=>{e.preventDefault();show('library')};$('#cancel').onclick=()=>show('library');$('#search').oninput=render;$('#sort').onchange=render;$('#tag').onchange=render;$('#favorites').onclick=()=>{favorites=!favorites;$('#favorites').setAttribute('aria-pressed',favorites);render()};$('#extract').onclick=()=>{if(!$('#paste').value.trim()){message('Paste your recipe text first.');$('#paste').focus();return}extract({text:$('#paste').value})};$('#extract-chatgpt').onclick=()=>{if(!$('#paste-chatgpt').value.trim()){message('Paste the ChatGPT recipe first.');$('#paste-chatgpt').focus();return}extract({text:$('#paste-chatgpt').value})};$('#pdf').onchange=async e=>{const file=e.target.files[0];if(!file)return;if(file.size>10_000_000){message('Choose a PDF smaller than 10 MB.');return}const reader=new FileReader();reader.onload=()=>extract({pdf:reader.result.split(',')[1]});reader.onerror=()=>message('Could not read this file.');reader.readAsDataURL(file)};
 form.onsubmit=async e=>{e.preventDefault();clearTimeout(recipeSaveTimer);$('#save').disabled=true;const version=recipeEditVersion;try{const saved=await queueRecipeSave();if(saved&&version===recipeEditVersion){dirty=false;clearRecipeDraft(recipeEditorToken);detail(saved.id);message('Recipe saved to your recipe book.')}else if(saved)scheduleRecipeSave()}catch(error){$('#recipe-save-status').textContent=error.message+' Your draft is kept on this device.'}finally{$('#save').disabled=false}};
-load().then(()=>{if(location.pathname==='/instagram'){editor();chooseImportMethod('video')}else if(location.pathname==='/menu'||refreshView==='menu')openMenu();else if(refreshView==='groceries')openGroceries()}).catch(e=>message('Could not load the recipe book: '+e.message)).finally(()=>{if(location.pathname==='/refresh')history.replaceState(null,'',refreshView==='menu'?'/menu':'/')});
+load().then(()=>{if(location.pathname==='/instagram'){editor();chooseImportMethod('video')}else if(location.pathname==='/menu'||refreshView==='menu')openMenu(menuWeekFromUrl()||saturdayOf(new Date()));else if(refreshView==='groceries')openGroceries()}).catch(e=>message('Could not load the recipe book: '+e.message)).finally(()=>{if(location.pathname==='/refresh'){const week=refreshView==='menu'?menuWeekFromUrl():null;history.replaceState(null,'',refreshView==='menu'?'/menu'+(week?`?week=${menuKey(week)}`:''):'/')}});
 if(document.modelContext?.registerTool){
  const lifecycle=new AbortController();
  const register=tool=>{try{Promise.resolve(document.modelContext.registerTool(tool,{signal:lifecycle.signal})).catch(()=>{})}catch{}};
@@ -270,6 +271,13 @@ window.setInterval(()=>{if(!$('#groceries').hidden&&document.visibilityState==='
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!$('#groceries').hidden)refreshGroceries()});
 function saturdayOf(date){const day=new Date(date.getFullYear(),date.getMonth(),date.getDate());day.setDate(day.getDate()-(day.getDay()+1)%7);return day}
 function menuKey(date){return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`}
+function menuWeekFromUrl(){
+ const key=new URLSearchParams(location.search).get('week');
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(key||''))return null;
+ const [year,month,day]=key.split('-').map(Number);
+ const week=new Date(year,month-1,day);
+ return menuKey(week)===key&&week.getDay()===6?week:null;
+}
 function menuHasContent(menu){return [...menu.days,menu.snacks,menu.lunches,menu.sweet_treats].some(value=>value.trim())}
 function renderMenuDisplay(menu){
  const dayRows=menuDayNames.map((name,index)=>{
@@ -288,6 +296,7 @@ async function openMenu(week=saturdayOf(new Date())){
  if($('#menu').hidden&&!show('menu'))return;
  document.querySelectorAll('[data-nav]').forEach(b=>{if(b.dataset.nav==='menu')b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
  menuWeek=week;menuDirty=false;$('#menu-status').textContent='Loading menu…';
+ if(location.pathname==='/menu')history.replaceState(null,'',`/menu?week=${menuKey(week)}`);
  const end=new Date(week);end.setDate(end.getDate()+6);
  $('#menu-heading').textContent=`${week.toLocaleDateString(undefined,{month:'short',day:'numeric'})} – ${end.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}`;
  $('#menu-form').hidden=true;$('#menu-display').hidden=true;
