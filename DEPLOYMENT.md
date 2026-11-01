@@ -1,5 +1,11 @@
 # Recipe Book deployment
 
+## 2026-11-01 selected-week links from Household Board
+
+Commit `07c17b8` opens `?week=YYYY-MM-DD` on the matching Saturday-start menu, keeps that week while navigating or loading a site update, and advances the shell to `recipe-shell-v34`. GitHub `main` and the Pi serve the release from `/home/ealtenho/recipe.altilab.com/recipe-book`.
+
+The pre-release data backup is `/home/ealtenho/recipe.altilab.com/recipe-book-backups/recipes-20261101T132433Z.zip`, the post-release backup is `recipes-20261101T132849Z.zip` beside it, and the code rollback archive is `code-before-board-menu-20261101T132433Z.tar.gz`. Hash-matched off-device copies are in `C:\Users\erica\Desktop\Codex\Recipe Book Backups`. Both ZIPs passed archive checks and all six members, including the SQLite database, weekly menus, groceries, recipes, and original PDF, matched byte for byte. All 57 Python tests passed locally and in the Pi staging copy. The weekly-menu browser check passed at 390px and 1440px, including a dated link and reload; the shell update browser check passed. The live service is active, `/api/site-version` reports v34, `/menu?week=2026-10-31` returns 200 on loopback, and an unsigned external request redirects to Cloudflare Access. Signed-in phone use remains unverified.
+
 ## 2026-10-22 grocery and phone navigation colors
 
 Commit `d521784` makes the desktop Groceries button cream with dark text and the phone navigation forest green with light labels. It builds on the Safari shell update and advances the shell and site-version signal to `recipe-shell-v29`. GitHub `main` and the Raspberry Pi serve the release.
