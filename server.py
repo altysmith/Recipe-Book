@@ -10,6 +10,8 @@ import os
 from pathlib import Path
 import re
 import sqlite3
+import threading
+import time
 import uuid
 import tempfile
 import zipfile
@@ -32,12 +34,32 @@ def connect():
     db = sqlite3.connect(DATA / 'recipes.sqlite3')
     db.execute('CREATE TABLE IF NOT EXISTS recipes (id TEXT PRIMARY KEY, title TEXT NOT NULL, document_json TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)')
     db.execute('CREATE TABLE IF NOT EXISTS weekly_menus (week_start TEXT PRIMARY KEY, document_json TEXT NOT NULL, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)')
-    db.execute('CREATE TABLE IF NOT EXISTS grocery_items (id TEXT PRIMARY KEY, text TEXT NOT NULL, checked INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)')
+    db.execute('CREATE TABLE IF NOT EXISTS grocery_items (id TEXT PRIMARY KEY, text TEXT NOT NULL, checked INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, checked_at TEXT)')
+    if 'checked_at' not in {row[1] for row in db.execute('PRAGMA table_info(grocery_items)')}:
+        # Existing checked items have no known check time. Give them a full day
+        # from migration rather than guessing from when they were added.
+        with db:
+            db.execute('BEGIN IMMEDIATE')
+            if 'checked_at' not in {row[1] for row in db.execute('PRAGMA table_info(grocery_items)')}:
+                db.execute('ALTER TABLE grocery_items ADD COLUMN checked_at TEXT')
+                db.execute('UPDATE grocery_items SET checked_at=CURRENT_TIMESTAMP WHERE checked=1')
     try:
         with db:
             yield db
     finally:
         db.close()
+
+def prune_expired_groceries(db):
+    db.execute("DELETE FROM grocery_items WHERE checked=1 AND checked_at <= datetime('now', '-24 hours')")
+
+def prune_groceries_periodically():
+    while True:
+        try:
+            with connect() as db:
+                prune_expired_groceries(db)
+        except sqlite3.Error as error:
+            print(f'Grocery cleanup failed: {error}', flush=True)
+        time.sleep(60)
 
 def draft(text):
     result = {'title': '', 'ingredients': [], 'instructions': [], 'tags': [], 'notes': '', 'import': {'status': 'awaiting_user_review', 'raw_text': text, 'issues': ['Check reading order, quantities, and completeness against the original before saving.']}}
@@ -122,6 +144,7 @@ class Handler(BaseHTTPRequestHandler):
         path = unquote(urlparse(self.path).path)
         if path == '/api/groceries':
             with connect() as db:
+                prune_expired_groceries(db)
                 rows = db.execute('SELECT id,text,checked FROM grocery_items ORDER BY checked,created_at,rowid').fetchall()
             return self.respond([{'id': row[0], 'text': row[1], 'checked': bool(row[2])} for row in rows])
         menu_match = re.fullmatch(r'/api/weekly-menu/(\d{4}-\d{2}-\d{2})', path)
@@ -232,6 +255,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not isinstance(body, dict): raise ValueError('Invalid grocery item.')
                 action = body.get('action')
                 with connect() as db:
+                    prune_expired_groceries(db)
                     if action == 'add':
                         text = body.get('text')
                         if not isinstance(text, str) or len(text) > 20_000:
@@ -247,7 +271,8 @@ class Handler(BaseHTTPRequestHandler):
                             raise ValueError('Invalid grocery item.')
                         if action == 'check':
                             if not isinstance(body.get('checked'), bool): raise ValueError('Invalid checked state.')
-                            cursor = db.execute('UPDATE grocery_items SET checked=? WHERE id=?', (int(body['checked']), item_id))
+                            checked = int(body['checked'])
+                            cursor = db.execute('UPDATE grocery_items SET checked=?, checked_at=CASE WHEN ?=1 THEN COALESCE(checked_at,CURRENT_TIMESTAMP) ELSE NULL END WHERE id=?', (checked, checked, item_id))
                         else:
                             cursor = db.execute('DELETE FROM grocery_items WHERE id=?', (item_id,))
                         if not cursor.rowcount: return self.respond({'error': 'This item is no longer on the list. Refresh to see the latest list.'}, 404)
@@ -359,5 +384,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     with connect():
         pass
+    threading.Thread(target=prune_groceries_periodically, daemon=True).start()
     print(f'Recipe Book: http://127.0.0.1:{args.port}', flush=True)
     ThreadingHTTPServer(('127.0.0.1', args.port), Handler).serve_forever()

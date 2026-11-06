@@ -12,6 +12,7 @@ from urllib.error import HTTPError
 import sys
 import struct
 import time
+from contextlib import closing
 from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import server
@@ -79,6 +80,47 @@ class RecipeTests(unittest.TestCase):
         self.assertEqual(self.post('/api/groceries', {'action':'clear_checked'})[0]['id'], eggs['id'])
         self.assertEqual(self.post('/api/groceries', {'action':'reset'}), [])
         self.assertEqual(json.load(urlopen(self.url+'/api/groceries')), [])
+
+    def test_checked_groceries_expire_after_24_hours_and_recheck_resets_clock(self):
+        milk = self.post('/api/groceries', {'action':'add','text':'Milk'})[0]
+        self.post('/api/groceries', {'action':'check','id':milk['id'],'checked':True})
+        with server.connect() as db:
+            first_check = db.execute('SELECT checked_at FROM grocery_items WHERE id=?', (milk['id'],)).fetchone()[0]
+            db.execute("UPDATE grocery_items SET checked_at=datetime('now', '-23 hours', '-59 minutes') WHERE id=?", (milk['id'],))
+            nearly_expired = db.execute('SELECT checked_at FROM grocery_items WHERE id=?', (milk['id'],)).fetchone()[0]
+        self.assertEqual(len(json.load(urlopen(self.url+'/api/groceries'))), 1)
+        self.post('/api/groceries', {'action':'check','id':milk['id'],'checked':True})
+        with server.connect() as db:
+            self.assertEqual(db.execute('SELECT checked_at FROM grocery_items WHERE id=?', (milk['id'],)).fetchone()[0], nearly_expired)
+        self.assertNotEqual(nearly_expired, first_check)
+        self.post('/api/groceries', {'action':'check','id':milk['id'],'checked':False})
+        with server.connect() as db:
+            self.assertIsNone(db.execute('SELECT checked_at FROM grocery_items WHERE id=?', (milk['id'],)).fetchone()[0])
+        self.post('/api/groceries', {'action':'check','id':milk['id'],'checked':True})
+        with server.connect() as db:
+            self.assertIsNotNone(db.execute('SELECT checked_at FROM grocery_items WHERE id=?', (milk['id'],)).fetchone()[0])
+            db.execute("UPDATE grocery_items SET checked_at=datetime('now', '-24 hours') WHERE id=?", (milk['id'],))
+        self.assertEqual(json.load(urlopen(self.url+'/api/groceries')), [])
+        with server.connect() as db:
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM grocery_items').fetchone()[0], 0)
+
+    def test_grocery_write_prunes_expired_items(self):
+        milk = self.post('/api/groceries', {'action':'add','text':'Milk'})[0]
+        self.post('/api/groceries', {'action':'check','id':milk['id'],'checked':True})
+        with server.connect() as db:
+            db.execute("UPDATE grocery_items SET checked_at=datetime('now', '-25 hours') WHERE id=?", (milk['id'],))
+        items = self.post('/api/groceries', {'action':'add','text':'Bread'})
+        self.assertEqual([item['text'] for item in items], ['Bread'])
+
+    def test_existing_checked_groceries_start_full_day_on_migration(self):
+        with closing(sqlite3.connect(server.DATA / 'recipes.sqlite3')) as db:
+            with db:
+                db.execute('CREATE TABLE grocery_items (id TEXT PRIMARY KEY, text TEXT NOT NULL, checked INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)')
+                db.execute("INSERT INTO grocery_items(id,text,checked,created_at) VALUES('old','Milk',1,datetime('now','-7 days'))")
+        self.assertEqual([item['text'] for item in json.load(urlopen(self.url+'/api/groceries'))], ['Milk'])
+        with server.connect() as db:
+            checked_at = db.execute("SELECT checked_at FROM grocery_items WHERE id='old'").fetchone()[0]
+            self.assertEqual(checked_at, db.execute('SELECT CURRENT_TIMESTAMP').fetchone()[0])
 
     def test_groceries_reject_invalid_item_without_writing(self):
         for payload in ({'action':'add','text':' '}, {'action':'add','text':'x'*201}, {'action':'check','id':'bad','checked':True}):

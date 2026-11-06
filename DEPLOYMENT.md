@@ -1,5 +1,11 @@
 # Recipe Book deployment
 
+## 2026-11-06 grocery checkoff expiry
+
+Checked grocery items now expire 24 hours after they are checked. Unchecking and checking again starts a new 24-hour period. The server removes expired items every minute and when the list is read or changed. Existing checked items received a full 24 hours when the new `checked_at` column was added. The daily backup helper now writes to `/home/ealtenho/Recipe.altylab.com/recipe-book-backups`.
+
+The pre-release backup is `recipes-20261106T120457Z.zip`; the post-release backup is `recipes-20261106T120627Z.zip` in that folder. The previous code archive is `/home/ealtenho/Recipe.altylab.com/recipe-release-grocery-expiry-20261106/before-code.tar.gz`. Verified copies are in `C:\Users\erica\Desktop\Codex\Recipe Book Backups`. Both backups passed SQLite integrity checks and preserved all 16 recipes, the one unchecked grocery item, and identical recipe, menu, and grocery exports. The 60-test local suite passed; the live service and backup helper passed after the code-only release. The website shell remains `recipe-shell-v34`.
+
 ## 2026-11-01 selected-week links from Household Board
 
 Commit `07c17b8` opens `?week=YYYY-MM-DD` on the matching Saturday-start menu, keeps that week while navigating or loading a site update, and advances the shell to `recipe-shell-v34`. GitHub `main` and the Pi serve the release from `/home/ealtenho/recipe.altilab.com/recipe-book`.
